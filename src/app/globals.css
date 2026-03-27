@@ -1,14 +1,14 @@
-
 @import "tailwindcss";
 
 :root {
   --background: #ffffff;
-  --foreground: #020817;
+  --foreground: #0f172a;
   --card: #ffffff;
-  --card-foreground: #020817;
+  --card-foreground: #0f172a;
   --popover: #ffffff;
-  --popover-foreground: #020817;
-  --primary: #0f172a;
+  --popover-foreground: #0f172a;
+  --primary: #4f46e5;
+  /* Indigo-600 */
   --primary-foreground: #f8fafc;
   --secondary: #f1f5f9;
   --secondary-foreground: #0f172a;
@@ -20,20 +20,24 @@
   --destructive-foreground: #f8fafc;
   --border: #e2e8f0;
   --input: #e2e8f0;
-  --ring: #020817;
-  --radius: 0.5rem;
+  --ring: #4f46e5;
+  --radius: 0.75rem;
 }
 
 .dark {
-  --background: #020817;
+  --background: #020617;
+  /* Slate-950 */
   --foreground: #f8fafc;
-  --card: #020817;
+  --card: #0f172a;
+  /* Slate-900 */
   --card-foreground: #f8fafc;
-  --popover: #020817;
+  --popover: #0f172a;
   --popover-foreground: #f8fafc;
-  --primary: #f8fafc;
-  --primary-foreground: #0f172a;
+  --primary: #6366f1;
+  /* Indigo-500 */
+  --primary-foreground: #f8fafc;
   --secondary: #1e293b;
+  /* Slate-800 */
   --secondary-foreground: #f8fafc;
   --muted: #1e293b;
   --muted-foreground: #94a3b8;
@@ -43,7 +47,7 @@
   --destructive-foreground: #f8fafc;
   --border: #1e293b;
   --input: #1e293b;
-  --ring: #cbd5e1;
+  --ring: #6366f1;
 }
 
 @theme inline {

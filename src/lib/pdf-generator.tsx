@@ -1,203 +1,465 @@
+import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 
-import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
-import { Quotation } from '@/types';
-
-// Register fonts if needed, creating a standard style
 const styles = StyleSheet.create({
     page: {
         flexDirection: 'column',
         backgroundColor: '#FFFFFF',
-        padding: 30,
+        padding: 40,
         fontFamily: 'Helvetica',
+        fontSize: 10,
+        color: '#333',
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 40,
-        borderBottomWidth: 1,
+        marginBottom: 30,
+        borderBottomWidth: 2,
         borderBottomColor: '#112233',
         paddingBottom: 20,
     },
-    companyDetails: {
-        fontSize: 10,
-        color: '#333',
+    companyLeft: {
+        width: '60%',
     },
-    title: {
+    docInfoRight: {
+        width: '35%',
+        textAlign: 'right',
+    },
+    companyName: {
+        fontSize: 20,
+        fontWeight: 'extrabold',
+        color: '#112233',
+        marginBottom: 4,
+    },
+    companyDetailLine: {
+        fontSize: 9,
+        color: '#555',
+        marginBottom: 2,
+    },
+    docTitle: {
         fontSize: 24,
         fontWeight: 'bold',
         color: '#112233',
-        marginBottom: 5,
+        marginBottom: 10,
+        letterSpacing: 2,
     },
-    subTitle: {
-        fontSize: 12,
+    docInfoGrid: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+    },
+    docInfoRow: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+    },
+    docInfoLabel: {
+        fontWeight: 'bold',
         color: '#666',
+        marginRight: 10,
+        width: 60,
+    },
+    docInfoValue: {
+        width: 80,
     },
     clientSection: {
+        flexDirection: 'row',
         marginBottom: 30,
+        backgroundColor: '#f8fafc',
+        padding: 15,
+        borderRadius: 4,
     },
-    sectionTitle: {
+    clientBlock: {
+        width: '50%',
+    },
+    sectionLabel: {
+        fontSize: 10,
+        fontWeight: 'bold',
+        color: '#64748b',
+        textTransform: 'uppercase',
+        marginBottom: 6,
+    },
+    clientName: {
         fontSize: 12,
         fontWeight: 'bold',
-        marginBottom: 5,
-        color: '#444',
+        color: '#0f172a',
+        marginBottom: 4,
     },
     table: {
         display: "flex",
         width: "auto",
-        borderStyle: "solid",
-        borderColor: "#bfbfbf",
-        borderWidth: 1,
-        borderRightWidth: 0,
-        borderBottomWidth: 0,
-        marginBottom: 20,
+        marginBottom: 30,
+    },
+    tableHeaderRow: {
+        flexDirection: "row",
+        backgroundColor: '#112233',
+        color: '#ffffff',
+        paddingVertical: 8,
+        paddingHorizontal: 4,
+        fontWeight: 'bold',
+        fontSize: 9,
     },
     tableRow: {
-        margin: "auto",
         flexDirection: "row",
+        borderBottomWidth: 1,
+        borderBottomColor: '#e2e8f0',
+        paddingVertical: 10,
+        paddingHorizontal: 4,
     },
-    tableColHeader: {
-        width: "50%",
-        borderStyle: "solid",
-        borderColor: "#bfbfbf",
-        borderBottomColor: "#000",
-        borderWidth: 1,
-        borderLeftWidth: 0,
-        borderTopWidth: 0,
-        backgroundColor: "#f0f0f0",
-    },
-    tableColHeaderSm: {
-        width: "15%",
-        borderStyle: "solid",
-        borderColor: "#bfbfbf",
-        borderBottomColor: "#000",
-        borderWidth: 1,
-        borderLeftWidth: 0,
-        borderTopWidth: 0,
-        backgroundColor: "#f0f0f0",
-    },
-    tableColHeaderMd: {
-        width: "20%",
-        borderStyle: "solid",
-        borderColor: "#bfbfbf",
-        borderBottomColor: "#000",
-        borderWidth: 1,
-        borderLeftWidth: 0,
-        borderTopWidth: 0,
-        backgroundColor: "#f0f0f0",
-    },
-    tableCol: {
-        width: "50%",
-        borderStyle: "solid",
-        borderColor: "#bfbfbf",
-        borderWidth: 1,
-        borderLeftWidth: 0,
-        borderTopWidth: 0,
-    },
-    tableColSm: {
-        width: "15%",
-        borderStyle: "solid",
-        borderColor: "#bfbfbf",
-        borderWidth: 1,
-        borderLeftWidth: 0,
-        borderTopWidth: 0,
-    },
-    tableColMd: {
-        width: "20%",
-        borderStyle: "solid",
-        borderColor: "#bfbfbf",
-        borderWidth: 1,
-        borderLeftWidth: 0,
-        borderTopWidth: 0,
-    },
-    tableCellHeader: {
-        margin: 5,
-        fontSize: 10,
-        fontWeight: 'bold',
-    },
-    tableCell: {
-        margin: 5,
-        fontSize: 10,
-    },
-    totalSection: {
+    colNo: { width: "8%" },
+    colDesc: { width: "47%" },
+    colQty: { width: "10%", textAlign: 'center' },
+    colPrice: { width: "15%", textAlign: 'right' },
+    colTotal: { width: "20%", textAlign: 'right' },
+    totalsArea: {
         flexDirection: 'row',
         justifyContent: 'flex-end',
-        marginTop: 10,
+        marginBottom: 40,
     },
-    totalText: {
-        fontSize: 14,
+    totalsBox: {
+        width: '40%',
+    },
+    totalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingVertical: 4,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
+    },
+    totalRowFinal: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingVertical: 8,
+        borderTopWidth: 2,
+        borderTopColor: '#112233',
+        marginTop: 4,
+    },
+    totalLabel: {
         fontWeight: 'bold',
-    }
+        color: '#64748b',
+    },
+    totalValue: {
+        fontWeight: 'bold',
+    },
+    totalValueFinal: {
+        fontWeight: 'bold',
+        fontSize: 14,
+        color: '#112233',
+    },
+    footerContainer: {
+        marginTop: 'auto',
+    },
+    notesBox: {
+        marginBottom: 20,
+    },
+    notesTitle: {
+        fontSize: 10,
+        fontWeight: 'bold',
+        color: '#64748b',
+        textTransform: 'uppercase',
+        marginBottom: 4,
+    },
+    notesContent: {
+        fontSize: 9,
+        color: '#475569',
+        lineHeight: 1.5,
+    },
+    bankBox: {
+        marginBottom: 20,
+        backgroundColor: '#f8fafc',
+        padding: 12,
+        borderRadius: 4,
+    },
+    bankTitle: {
+        fontSize: 10,
+        fontWeight: 'bold',
+        color: '#64748b',
+        textTransform: 'uppercase',
+        marginBottom: 6,
+    },
+    bankLine: {
+        fontSize: 9,
+        color: '#475569',
+        marginBottom: 2,
+    },
+    signaturesRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 20,
+    },
+    signatureBlock: {
+        width: '40%',
+    },
+    signatureLine: {
+        height: 60,
+        borderBottomWidth: 1,
+        borderBottomColor: '#cbd5e1',
+        marginBottom: 8,
+    },
+    signatureLabel: {
+        fontSize: 9,
+        color: '#64748b',
+        textAlign: 'center',
+    },
+    receiptHeader: {
+        textAlign: 'center',
+        marginBottom: 30,
+        borderBottomWidth: 2,
+        borderBottomColor: '#112233',
+        paddingBottom: 20,
+    },
+    receiptTitle: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: '#112233',
+        letterSpacing: 3,
+        marginBottom: 8,
+    },
+    receiptDetail: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
+    },
+    receiptLabel: {
+        fontSize: 11,
+        fontWeight: 'bold',
+        color: '#64748b',
+    },
+    receiptValue: {
+        fontSize: 11,
+        color: '#0f172a',
+    },
+    receiptAmountBox: {
+        backgroundColor: '#112233',
+        padding: 20,
+        borderRadius: 4,
+        marginTop: 30,
+        alignItems: 'center',
+    },
+    receiptAmountLabel: {
+        fontSize: 10,
+        color: '#94a3b8',
+        textTransform: 'uppercase',
+        marginBottom: 4,
+    },
+    receiptAmount: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#ffffff',
+    },
 });
 
-interface PdfProps {
-    type: 'Quotation' | 'Invoice';
-    data: any; // Type properly later
+interface CompanyDetails {
+    companyName: string;
+    address: string;
+    contactNo: string;
+    email: string;
+    website?: string | null;
+    brn?: string | null;
+    sstNumber?: string | null;
+    enableSst?: boolean;
+    bankName?: string | null;
+    bankAccount?: string | null;
+    bankSwift?: string | null;
+    logoUrl?: string | null;
 }
 
-export const PdfDocument = ({ type, data }: PdfProps) => (
-    <Document>
-        <Page size="A4" style={styles.page}>
-            <View style={styles.header}>
-                <View>
-                    <Text style={styles.title}>{type.toUpperCase()}</Text>
-                    <Text style={styles.subTitle}>#{data.number}</Text>
+interface PdfProps {
+    type: 'Quotation' | 'Invoice' | 'Receipt';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    data: any;
+    companyDetails?: CompanyDetails;
+}
+
+const formatMoney = (n: number) => n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+export const PdfDocument = ({ type, data, companyDetails }: PdfProps) => {
+    if (type === 'Receipt') {
+        return (
+            <Document>
+                <Page size="A4" style={styles.page}>
+                    <View style={{ textAlign: 'center', marginBottom: 20 }}>
+                        <Text style={styles.companyName}>{companyDetails?.companyName || 'SwiftApp Ecosystem'}</Text>
+                        <Text style={styles.companyDetailLine}>{companyDetails?.address || ''}</Text>
+                        <Text style={styles.companyDetailLine}>Tel: {companyDetails?.contactNo || ''} | Email: {companyDetails?.email || ''}</Text>
+                    </View>
+
+                    <View style={styles.receiptHeader}>
+                        <Text style={styles.receiptTitle}>RECEIPT</Text>
+                        <Text style={{ fontSize: 11, color: '#64748b' }}>Payment Acknowledgement</Text>
+                    </View>
+
+                    <View style={{ marginBottom: 30 }}>
+                        <View style={styles.receiptDetail}>
+                            <Text style={styles.receiptLabel}>Receipt No.</Text>
+                            <Text style={styles.receiptValue}>{String(data.receiptNumber || '')}</Text>
+                        </View>
+                        <View style={styles.receiptDetail}>
+                            <Text style={styles.receiptLabel}>Invoice Ref.</Text>
+                            <Text style={styles.receiptValue}>{String(data.invoiceNumber || '')}</Text>
+                        </View>
+                        <View style={styles.receiptDetail}>
+                            <Text style={styles.receiptLabel}>Payment Method</Text>
+                            <Text style={styles.receiptValue}>{String(data.paymentMethod || 'N/A')}</Text>
+                        </View>
+                        <View style={styles.receiptDetail}>
+                            <Text style={styles.receiptLabel}>Payment Date</Text>
+                            <Text style={styles.receiptValue}>{String(data.paymentDate || '')}</Text>
+                        </View>
+                        <View style={styles.receiptDetail}>
+                            <Text style={styles.receiptLabel}>Project</Text>
+                            <Text style={styles.receiptValue}>{String(data.projectName || '')}</Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.receiptAmountBox}>
+                        <Text style={styles.receiptAmountLabel}>Amount Paid</Text>
+                        <Text style={styles.receiptAmount}>RM {formatMoney(Number(data.amountPaid || 0))}</Text>
+                    </View>
+
+                    <View style={styles.footerContainer}>
+                        <Text style={{ fontSize: 9, color: '#94a3b8', textAlign: 'center', marginTop: 40 }}>
+                            This is a computer-generated receipt. No signature is required.
+                        </Text>
+                    </View>
+                </Page>
+            </Document>
+        );
+    }
+
+    const items = (data.items as { description: string; quantity: number; unitPrice: number }[]) || [];
+    const subtotal = items.reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0);
+    const hasSST = !!companyDetails?.enableSst;
+    const sstRate = 0.08;
+    const sstAmount = hasSST ? subtotal * sstRate : 0;
+    const grandTotal = hasSST ? subtotal + sstAmount : subtotal;
+
+    const showBankDetails = type === 'Invoice' && (companyDetails?.bankName || companyDetails?.bankAccount);
+
+    return (
+        <Document>
+            <Page size="A4" style={styles.page}>
+                <View style={styles.header}>
+                    <View style={styles.companyLeft}>
+                        <Text style={styles.companyName}>{companyDetails?.companyName || 'SwiftApp Ecosystem'}</Text>
+                        {companyDetails?.brn && (
+                            <Text style={styles.companyDetailLine}>BRN: {companyDetails.brn}</Text>
+                        )}
+                        {companyDetails?.sstNumber && (
+                            <Text style={styles.companyDetailLine}>SST No: {companyDetails.sstNumber}</Text>
+                        )}
+                        <Text style={styles.companyDetailLine}>{companyDetails?.address || '123 Tech Street, Cyberjaya, Malaysia'}</Text>
+                        <Text style={styles.companyDetailLine}>Tel: {companyDetails?.contactNo || '+60 123 456 789'}</Text>
+                        <Text style={styles.companyDetailLine}>Email: {companyDetails?.email || 'admin@swiftapp.com'}</Text>
+                        {companyDetails?.website && (
+                            <Text style={styles.companyDetailLine}>Web: {companyDetails.website}</Text>
+                        )}
+                    </View>
+
+                    <View style={styles.docInfoRight}>
+                        <Text style={styles.docTitle}>{type.toUpperCase()}</Text>
+                        <View style={styles.docInfoGrid}>
+                            <View style={styles.docInfoRow}>
+                                <Text style={styles.docInfoLabel}>{type} No.</Text>
+                                <Text style={styles.docInfoValue}>{String(data.number || '')}</Text>
+                            </View>
+                            <View style={styles.docInfoRow}>
+                                <Text style={styles.docInfoLabel}>Date</Text>
+                                <Text style={styles.docInfoValue}>{new Date().toLocaleDateString('en-MY')}</Text>
+                            </View>
+                            {type === 'Invoice' && (
+                                <View style={styles.docInfoRow}>
+                                    <Text style={styles.docInfoLabel}>Terms</Text>
+                                    <Text style={styles.docInfoValue}>C.O.D</Text>
+                                </View>
+                            )}
+                        </View>
+                    </View>
                 </View>
-                <View style={styles.companyDetails}>
-                    <Text style={{ fontWeight: 'bold', fontSize: 12 }}>SwiftApp Ecosystem</Text>
-                    <Text>123 Tech Street, Cyberjaya</Text>
-                    <Text>Selangor, Malaysia</Text>
-                    <Text>admin@swiftapp.com</Text>
-                </View>
-            </View>
 
-            <View style={styles.clientSection}>
-                <Text style={styles.sectionTitle}>Bill To:</Text>
-                <Text style={{ fontSize: 11 }}>{data.clientName}</Text>
-                <Text style={{ fontSize: 11 }}>{data.clientEmail}</Text>
-            </View>
-
-            <View style={styles.table}>
-                <View style={styles.tableRow}>
-                    <View style={styles.tableColHeader}>
-                        <Text style={styles.tableCellHeader}>Description</Text>
-                    </View>
-                    <View style={styles.tableColHeaderSm}>
-                        <Text style={styles.tableCellHeader}>Qty</Text>
-                    </View>
-                    <View style={styles.tableColHeaderMd}>
-                        <Text style={styles.tableCellHeader}>Unit Price</Text>
-                    </View>
-                    <View style={styles.tableColHeaderSm}>
-                        <Text style={styles.tableCellHeader}>Total</Text>
+                <View style={styles.clientSection}>
+                    <View style={styles.clientBlock}>
+                        <Text style={styles.sectionLabel}>{type === 'Invoice' ? 'Bill To:' : 'Quotation For:'}</Text>
+                        <Text style={styles.clientName}>{String(data.clientName || 'Valued Client')}</Text>
+                        {data.clientBrn && (
+                            <Text style={{ fontSize: 9, color: '#475569', marginBottom: 2 }}>BRN: {String(data.clientBrn)}</Text>
+                        )}
+                        <Text style={{ fontSize: 9, color: '#475569' }}>{String(data.clientEmail || '')}</Text>
                     </View>
                 </View>
 
-                {data.items.map((item: any, i: number) => (
-                    <View style={styles.tableRow} key={i}>
-                        <View style={styles.tableCol}>
-                            <Text style={styles.tableCell}>{item.description}</Text>
+                <View style={styles.table}>
+                    <View style={styles.tableHeaderRow}>
+                        <Text style={styles.colNo}>No.</Text>
+                        <Text style={styles.colDesc}>Description</Text>
+                        <Text style={styles.colQty}>Qty</Text>
+                        <Text style={styles.colPrice}>Unit Price (RM)</Text>
+                        <Text style={styles.colTotal}>Amount (RM)</Text>
+                    </View>
+
+                    {items.map((item, i: number) => (
+                        <View style={styles.tableRow} key={i}>
+                            <Text style={styles.colNo}>{i + 1}</Text>
+                            <Text style={styles.colDesc}>{item.description}</Text>
+                            <Text style={styles.colQty}>{item.quantity}</Text>
+                            <Text style={styles.colPrice}>{formatMoney(item.unitPrice)}</Text>
+                            <Text style={styles.colTotal}>{formatMoney(item.quantity * item.unitPrice)}</Text>
                         </View>
-                        <View style={styles.tableColSm}>
-                            <Text style={styles.tableCell}>{item.quantity}</Text>
+                    ))}
+                </View>
+
+                <View style={styles.totalsArea}>
+                    <View style={styles.totalsBox}>
+                        <View style={styles.totalRow}>
+                            <Text style={styles.totalLabel}>Subtotal</Text>
+                            <Text style={styles.totalValue}>{formatMoney(subtotal)}</Text>
                         </View>
-                        <View style={styles.tableColMd}>
-                            <Text style={styles.tableCell}>{item.unitPrice.toLocaleString()}</Text>
-                        </View>
-                        <View style={styles.tableColSm}>
-                            <Text style={styles.tableCell}>{(item.quantity * item.unitPrice).toLocaleString()}</Text>
+                        {hasSST && (
+                            <View style={styles.totalRow}>
+                                <Text style={styles.totalLabel}>SST (8%)</Text>
+                                <Text style={styles.totalValue}>{formatMoney(sstAmount)}</Text>
+                            </View>
+                        )}
+                        <View style={styles.totalRowFinal}>
+                            <Text style={styles.totalLabel}>Grand Total (RM)</Text>
+                            <Text style={styles.totalValueFinal}>{formatMoney(grandTotal)}</Text>
                         </View>
                     </View>
-                ))}
-            </View>
+                </View>
 
-            <View style={styles.totalSection}>
-                <Text style={styles.totalText}>Total: RM {data.total.toLocaleString()}</Text>
-            </View>
+                <View style={styles.footerContainer}>
+                    {showBankDetails && (
+                        <View style={styles.bankBox}>
+                            <Text style={styles.bankTitle}>Payment Details</Text>
+                            {companyDetails?.bankName && (
+                                <Text style={styles.bankLine}>Bank: {companyDetails.bankName}</Text>
+                            )}
+                            {companyDetails?.bankAccount && (
+                                <Text style={styles.bankLine}>Account No: {companyDetails.bankAccount}</Text>
+                            )}
+                            {companyDetails?.bankSwift && (
+                                <Text style={styles.bankLine}>SWIFT: {companyDetails.bankSwift}</Text>
+                            )}
+                        </View>
+                    )}
 
-            <View style={{ marginTop: 50 }}>
-                <Text style={styles.sectionTitle}>Notes / Terms:</Text>
-                <Text style={{ fontSize: 10, color: '#555' }}>{data.notes}</Text>
-            </View>
-        </Page>
-    </Document>
-);
+                    <View style={styles.notesBox}>
+                        <Text style={styles.notesTitle}>Terms & Conditions</Text>
+                        <Text style={styles.notesContent}>{String(data.notes || 'All payments must be made within the specified terms.')}</Text>
+                    </View>
+
+                    <View style={styles.signaturesRow}>
+                        <View style={styles.signatureBlock}>
+                            <View style={styles.signatureLine}></View>
+                            <Text style={styles.signatureLabel}>Client Acceptance & Stamp</Text>
+                        </View>
+                        <View style={styles.signatureBlock}>
+                            <View style={styles.signatureLine}></View>
+                            <Text style={styles.signatureLabel}>Authorized Signature & Stamp</Text>
+                        </View>
+                    </View>
+                </View>
+            </Page>
+        </Document>
+    );
+};

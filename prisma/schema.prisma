@@ -1,0 +1,212 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Enums ──────────────────────────────────────────────
+
+enum ProjectStatus {
+  Drafting
+  Dev
+  UAT
+  Live
+}
+
+enum MilestoneStatus {
+  Pending
+  InProgress @map("In Progress")
+  Completed
+  Invoiced
+  Paid
+}
+
+enum QuotationStatus {
+  Draft
+  Sent
+  Accepted
+  Rejected
+}
+
+enum InvoiceStatus {
+  Draft
+  Sent
+  Paid
+  Void
+}
+
+enum InvoiceType {
+  Deposit
+  Progress
+  Final
+  Monthly
+}
+
+enum CostCategory {
+  Server
+  Domain
+  Software
+  Other
+}
+
+// ── Models ─────────────────────────────────────────────
+
+model Project {
+  id          String        @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  status      ProjectStatus @default(Drafting)
+  sowDetails  String?       @map("sow_details") @db.Text
+  clientName  String?       @map("client_name")
+  clientEmail String?       @map("client_email")
+  clientBrn   String?       @map("client_brn")
+  isArchived  Boolean       @default(false) @map("is_archived")
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  milestones Milestone[]
+  quotations Quotation[]
+  invoices   Invoice[]
+  timeLogs   TimeLog[]
+  costs      ProjectCost[]
+
+  @@map("projects")
+}
+
+model Milestone {
+  id          String          @id @default(uuid()) @db.Uuid
+  projectId   String          @map("project_id") @db.Uuid
+  name        String
+  description String?
+  status      MilestoneStatus @default(Pending)
+  amount      Decimal         @default(0) @db.Decimal(10, 2)
+  dueDate     DateTime?       @map("due_date") @db.Date
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz
+
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  invoices Invoice[]
+  timeLogs TimeLog[]
+
+  @@map("milestones")
+}
+
+model Quotation {
+  id              String          @id @default(uuid()) @db.Uuid
+  projectId       String?         @map("project_id") @db.Uuid
+  quotationNumber String          @unique @map("quotation_number")
+  clientName      String          @map("client_name")
+  clientEmail     String?         @map("client_email")
+  clientBrn       String?         @map("client_brn")
+  items           Json            @default("[]")
+  totalAmount     Decimal         @default(0) @map("total_amount") @db.Decimal(10, 2)
+  status          QuotationStatus @default(Draft)
+  validUntil      DateTime?       @map("valid_until") @db.Date
+  notes           String?
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@map("quotations")
+}
+
+model Invoice {
+  id            String        @id @default(uuid()) @db.Uuid
+  projectId     String        @map("project_id") @db.Uuid
+  milestoneId   String?       @map("milestone_id") @db.Uuid
+  invoiceNumber String        @unique @map("invoice_number")
+  type          InvoiceType
+  amount        Decimal       @default(0) @db.Decimal(10, 2)
+  status        InvoiceStatus @default(Draft)
+  dueDate       DateTime?     @map("due_date") @db.Date
+  items         Json?         @default("[]")
+  clientName    String?       @map("client_name")
+  clientEmail   String?       @map("client_email")
+  clientBrn     String?       @map("client_brn")
+  notes         String?
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestone Milestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  receipts  Receipt[]
+
+  @@map("invoices")
+}
+
+model Receipt {
+  id            String   @id @default(uuid()) @db.Uuid
+  invoiceId     String   @map("invoice_id") @db.Uuid
+  receiptNumber String   @unique @map("receipt_number")
+  amountPaid    Decimal  @map("amount_paid") @db.Decimal(10, 2)
+  paymentMethod String?  @map("payment_method")
+  paymentDate   DateTime @default(now()) @map("payment_date") @db.Date
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("receipts")
+}
+
+model BusinessSettings {
+  id          String   @id @default("default")
+  companyName String   @map("company_name")
+  address     String   @db.Text
+  contactNo   String   @map("contact_no")
+  email       String
+  website     String?
+  brn         String?
+  sstNumber   String?
+  enableSst   Boolean  @default(false) @map("enable_sst")
+  bankName    String?  @map("bank_name")
+  bankAccount String?  @map("bank_account")
+  bankSwift   String?  @map("bank_swift")
+  logoUrl     String?  @map("logo_url")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("business_settings")
+}
+
+model TimeLog {
+  id          String    @id @default(uuid()) @db.Uuid
+  projectId   String    @map("project_id") @db.Uuid
+  milestoneId String?   @map("milestone_id") @db.Uuid
+  hours       Decimal   @db.Decimal(10, 2)
+  description String
+  date        DateTime  @db.Date
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestone   Milestone? @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  @@map("time_logs")
+}
+
+model ProjectCost {
+  id          String       @id @default(uuid()) @db.Uuid
+  projectId   String       @map("project_id") @db.Uuid
+  category    CostCategory
+  amount      Decimal      @db.Decimal(10, 2)
+  description String
+  date        DateTime     @db.Date
+  reference   String?
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_costs")
+}
+
+model Sequence {
+  id        String @id
+  prefix    String
+  lastValue Int    @default(0) @map("last_value")
+
+  @@map("sequences")
+}

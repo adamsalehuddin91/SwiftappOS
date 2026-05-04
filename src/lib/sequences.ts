@@ -7,7 +7,7 @@ export async function getNextNumber(type: "invoice" | "quotation" | "receipt"): 
     const seq = await tx.sequence.upsert({
       where: { id: type },
       update: { lastValue: { increment: 1 } },
-      create: { id: type, lastValue: 1 },
+      create: { id: type, prefix: type, lastValue: 1 },
     });
     return seq.lastValue;
   });

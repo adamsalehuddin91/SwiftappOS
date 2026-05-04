@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Trash2, Plus, Download, FileText, User, CheckCircle2, Loader2, Phone, Calendar } from "lucide-react";
+import { ArrowLeft, Trash2, Plus, Download, FileText, User, CheckCircle2, Loader2, Phone, Calendar, Zap } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { PdfDocument } from "@/lib/pdf-generator";
+import { QUOTATION_PRESETS } from "@/lib/billing-presets";
 import { toast } from "sonner";
 
 const PDFDownloadLink = dynamic(
@@ -30,17 +31,16 @@ interface QuotationItem {
 
 export default function NewQuotationPage() {
   const router = useRouter();
+  const [activePreset, setActivePreset] = useState<string | null>(null);
   const [items, setItems] = useState<QuotationItem[]>([
-    { id: 1, description: "Backend Development", quantity: 1, unitPrice: 5000 },
+    { id: 1, description: "", quantity: 1, unitPrice: 0 },
   ]);
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [clientBrn, setClientBrn] = useState("");
   const [validDays, setValidDays] = useState("30");
-  const [notes, setNotes] = useState(
-    "1. 50% Deposit required to commence work.\n2. Balance 50% upon completion.\n3. Quotation valid for 30 days."
-  );
+  const [notes, setNotes] = useState("");
   const [isClient, setIsClient] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -54,11 +54,19 @@ export default function NewQuotationPage() {
       .catch(() => toast.error("Failed to load company settings"));
   }, []);
 
+  const applyPreset = (presetId: string) => {
+    const preset = QUOTATION_PRESETS.find(p => p.id === presetId);
+    if (!preset) return;
+    setActivePreset(presetId);
+    setItems(preset.items.map((item, idx) => ({ ...item, id: idx + 1 })));
+    setNotes(preset.notes);
+    setValidDays(preset.validDays);
+    setSaved(false);
+    toast.success(`Preset "${preset.label}" diapply`);
+  };
+
   const addItem = () => {
-    setItems([
-      ...items,
-      { id: Date.now(), description: "", quantity: 1, unitPrice: 0 },
-    ]);
+    setItems([...items, { id: Date.now(), description: "", quantity: 1, unitPrice: 0 }]);
   };
 
   const removeItem = (id: number) => {
@@ -66,11 +74,7 @@ export default function NewQuotationPage() {
   };
 
   const updateItem = (id: number, field: keyof QuotationItem, value: string | number) => {
-    setItems(
-      items.map((item) =>
-        item.id === id ? { ...item, [field]: value } : item
-      )
-    );
+    setItems(items.map((item) => item.id === id ? { ...item, [field]: value } : item));
   };
 
   const calculateTotal = () => {
@@ -96,11 +100,7 @@ export default function NewQuotationPage() {
           clientEmail: clientEmail || undefined,
           clientPhone: clientPhone || undefined,
           clientBrn: clientBrn || undefined,
-          items: items.map(({ description, quantity, unitPrice }) => ({
-            description,
-            quantity,
-            unitPrice,
-          })),
+          items: items.map(({ description, quantity, unitPrice }) => ({ description, quantity, unitPrice })),
           notes,
           validUntil: validDays
             ? new Date(Date.now() + Number(validDays) * 86400000).toISOString().split("T")[0]
@@ -111,9 +111,7 @@ export default function NewQuotationPage() {
         const data = await res.json();
         setSaved(true);
         toast.success("Quotation saved as draft");
-        if (data?.id) {
-          router.push(`/billing/quotations/${data.id}`);
-        }
+        if (data?.id) router.push(`/billing/quotations/${data.id}`);
       } else {
         const err = await res.json().catch(() => null);
         toast.error(err?.error || "Failed to save quotation");
@@ -153,6 +151,42 @@ export default function NewQuotationPage() {
         </div>
       </div>
 
+      {/* Quick Presets */}
+      <Card className="border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5">
+        <CardHeader className="border-b border-border/50 pb-4">
+          <CardTitle className="text-base font-bold flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
+            <Zap className="h-4 w-4 text-primary" />
+            Quick Preset — SwiftApps Packages
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {QUOTATION_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => applyPreset(preset.id)}
+                className={`rounded-xl border-2 p-4 text-left transition-all ${
+                  activePreset === preset.id
+                    ? preset.color + " ring-2 ring-offset-1 ring-current"
+                    : preset.color
+                }`}
+              >
+                <div className="font-black text-sm mb-1">{preset.label}</div>
+                <div className="text-xs font-bold opacity-70">
+                  RM {preset.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0).toLocaleString()}
+                </div>
+              </button>
+            ))}
+          </div>
+          {activePreset && (
+            <p className="text-xs text-muted-foreground mt-3">
+              ✓ Preset diapply — edit mana-mana field mengikut keperluan client.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       {saved && (
         <Card className="border-emerald-500/30 bg-emerald-500/10">
           <CardContent className="py-4 flex items-center gap-3">
@@ -167,6 +201,7 @@ export default function NewQuotationPage() {
 
       <div className="grid gap-6 md:grid-cols-3">
         <div className="md:col-span-2 space-y-6">
+          {/* Client Info */}
           <Card className="border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5">
             <CardHeader className="border-b border-border/50 pb-4">
               <CardTitle className="text-base font-bold flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
@@ -179,7 +214,7 @@ export default function NewQuotationPage() {
                 <Label htmlFor="clientName">Client Name</Label>
                 <Input
                   id="clientName"
-                  placeholder="Enter client company name"
+                  placeholder="Nama syarikat / individu"
                   value={clientName}
                   onChange={(e) => { setClientName(e.target.value); setSaved(false); }}
                   className="bg-secondary/20 border-border/50 focus:border-primary/50"
@@ -200,7 +235,7 @@ export default function NewQuotationPage() {
                   <Label htmlFor="clientBrn">BRN (Optional)</Label>
                   <Input
                     id="clientBrn"
-                    placeholder="Company BRN"
+                    placeholder="No. Pendaftaran Syarikat"
                     value={clientBrn}
                     onChange={(e) => setClientBrn(e.target.value)}
                     className="bg-secondary/20 border-border/50 focus:border-primary/50"
@@ -226,17 +261,18 @@ export default function NewQuotationPage() {
                     onChange={(e) => setValidDays(e.target.value)}
                     className="h-10 rounded-md border border-border/50 bg-secondary/20 px-3 text-sm focus:border-primary/50 focus:outline-none"
                   >
-                    <option value="7">7 days</option>
-                    <option value="14">14 days</option>
-                    <option value="30">30 days</option>
-                    <option value="60">60 days</option>
-                    <option value="90">90 days</option>
+                    <option value="7">7 hari</option>
+                    <option value="14">14 hari</option>
+                    <option value="30">30 hari</option>
+                    <option value="60">60 hari</option>
+                    <option value="90">90 hari</option>
                   </select>
                 </div>
               </div>
             </CardContent>
           </Card>
 
+          {/* Line Items */}
           <Card className="border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5">
             <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 pb-4">
               <CardTitle className="text-base font-bold flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
@@ -249,66 +285,71 @@ export default function NewQuotationPage() {
             </CardHeader>
             <CardContent className="pt-6 space-y-4">
               {items.map((item) => (
-                <div key={item.id} className="grid grid-cols-12 gap-4 items-end bg-secondary/10 p-4 rounded-xl border border-border/50">
-                  <div className="col-span-6">
-                    <Label className="text-xs mb-1.5 block text-muted-foreground">Description</Label>
-                    <Input
-                      value={item.description}
-                      onChange={(e) => updateItem(item.id, "description", e.target.value)}
-                      placeholder="Item description"
-                      className="bg-secondary/20 border-border/50 h-9"
-                    />
+                <div key={item.id} className="space-y-3 bg-secondary/10 p-4 rounded-xl border border-border/50">
+                  <div className="grid grid-cols-12 gap-3 items-end">
+                    <div className="col-span-11">
+                      <Label className="text-xs mb-1.5 block text-muted-foreground">Description</Label>
+                      <Textarea
+                        value={item.description}
+                        onChange={(e) => updateItem(item.id, "description", e.target.value)}
+                        placeholder="Nama + penerangan perkhidmatan (boleh paste feature list)"
+                        className="bg-secondary/20 border-border/50 min-h-[80px] text-sm leading-relaxed"
+                      />
+                    </div>
+                    <div className="col-span-1 pb-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-red-500 hover:text-red-400 hover:bg-red-500/10 h-9 w-9"
+                        onClick={() => removeItem(item.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="col-span-2">
-                    <Label className="text-xs mb-1.5 block text-muted-foreground">Qty</Label>
-                    <Input
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(item.id, "quantity", Number(e.target.value))}
-                      min={1}
-                      className="bg-secondary/20 border-border/50 h-9"
-                    />
-                  </div>
-                  <div className="col-span-3">
-                    <Label className="text-xs mb-1.5 block text-muted-foreground">Unit Price (RM)</Label>
-                    <Input
-                      type="number"
-                      value={item.unitPrice}
-                      onChange={(e) => updateItem(item.id, "unitPrice", Number(e.target.value))}
-                      min={0}
-                      className="bg-secondary/20 border-border/50 h-9"
-                    />
-                  </div>
-                  <div className="col-span-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-red-500 hover:text-red-400 hover:bg-red-500/10 h-9 w-9"
-                      onClick={() => removeItem(item.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs mb-1.5 block text-muted-foreground">Qty</Label>
+                      <Input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => updateItem(item.id, "quantity", Number(e.target.value))}
+                        min={1}
+                        className="bg-secondary/20 border-border/50 h-9"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs mb-1.5 block text-muted-foreground">Unit Price (RM)</Label>
+                      <Input
+                        type="number"
+                        value={item.unitPrice}
+                        onChange={(e) => updateItem(item.id, "unitPrice", Number(e.target.value))}
+                        min={0}
+                        className="bg-secondary/20 border-border/50 h-9"
+                      />
+                    </div>
                   </div>
                 </div>
               ))}
 
               <div className="flex justify-end pt-6 border-t border-border/50">
                 <div className="text-right">
-                  <p className="text-sm font-medium text-muted-foreground">Total Estimate</p>
+                  <p className="text-sm font-medium text-muted-foreground">Jumlah Keseluruhan</p>
                   <p className="text-3xl font-black text-foreground">RM {calculateTotal().toLocaleString()}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
+          {/* Notes */}
           <Card className="border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5">
             <CardHeader className="border-b border-border/50 pb-4">
-              <CardTitle className="text-base font-bold uppercase tracking-wider text-muted-foreground">Terms & Conditions</CardTitle>
+              <CardTitle className="text-base font-bold uppercase tracking-wider text-muted-foreground">Terma & Syarat</CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
               <Textarea
-                placeholder="Enter payment terms, validity, etc."
-                className="min-h-[120px] bg-secondary/20 border-border/50 focus:border-primary/50 font-mono text-sm leading-relaxed"
+                placeholder="Syarat pembayaran, tempoh sah, nota lain..."
+                className="min-h-[140px] bg-secondary/20 border-border/50 focus:border-primary/50 font-mono text-sm leading-relaxed"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />
@@ -316,6 +357,7 @@ export default function NewQuotationPage() {
           </Card>
         </div>
 
+        {/* Actions sidebar */}
         <div className="space-y-6">
           <Card className="border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5 sticky top-6">
             <CardHeader className="border-b border-border/50 pb-4">
@@ -342,19 +384,26 @@ export default function NewQuotationPage() {
                 disabled={saving || !clientName.trim() || saved}
               >
                 {saving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Saving...
-                  </>
+                  <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</>
                 ) : saved ? (
-                  <>
-                    <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-500" />
-                    Saved
-                  </>
+                  <><CheckCircle2 className="h-4 w-4 mr-2 text-emerald-500" />Saved</>
                 ) : (
                   "Save as Draft"
                 )}
               </Button>
+
+              {/* Preset summary */}
+              {activePreset && (() => {
+                const p = QUOTATION_PRESETS.find(x => x.id === activePreset);
+                return p ? (
+                  <div className="pt-3 border-t border-border/50">
+                    <p className="text-xs font-bold uppercase text-muted-foreground mb-2">Active Preset</p>
+                    <div className={`rounded-lg border px-3 py-2 text-xs font-bold ${p.color}`}>
+                      {p.label} — RM {p.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0).toLocaleString()}
+                    </div>
+                  </div>
+                ) : null;
+              })()}
             </CardContent>
           </Card>
         </div>

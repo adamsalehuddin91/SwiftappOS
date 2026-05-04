@@ -12,7 +12,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Download, Loader2, CheckCircle2, WalletCards, Send, Pencil, Ban, CreditCard, Clock } from "lucide-react";
+import { ArrowLeft, Download, Loader2, CheckCircle2, WalletCards, Send, Pencil, Ban, CreditCard, Clock, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
@@ -316,7 +316,15 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
                   <tbody className="divide-y divide-border/50">
                     {receipts.map((receipt) => (
                       <tr key={receipt.id} className="hover:bg-secondary/20 transition-colors">
-                        <td className="py-3 font-mono font-bold text-primary">{receipt.receiptNumber}</td>
+                        <td className="py-3">
+                          <Link
+                            href={`/billing/receipts/${receipt.id}`}
+                            className="font-mono font-bold text-primary hover:underline flex items-center gap-1"
+                          >
+                            {receipt.receiptNumber}
+                            <ExternalLink className="h-3 w-3 opacity-50" />
+                          </Link>
+                        </td>
                         <td className="py-3 text-muted-foreground">{receipt.paymentMethod ?? "-"}</td>
                         <td className="py-3 text-muted-foreground">{new Date(receipt.paymentDate).toLocaleDateString()}</td>
                         <td className="py-3 text-right font-bold text-emerald-500">

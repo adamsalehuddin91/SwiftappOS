@@ -6,24 +6,53 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Download, Loader2, Receipt as ReceiptIcon, FileText, Calendar, CreditCard, Hash } from "lucide-react";
 import Link from "next/link";
-import { Receipt } from "@/types";
 import { toast } from "sonner";
+import dynamic from "next/dynamic";
+import { PdfDocument } from "@/lib/pdf-generator";
+
+const PDFDownloadLink = dynamic(
+    () => import("@react-pdf/renderer").then((mod) => mod.PDFDownloadLink),
+    {
+        ssr: false,
+        loading: () => <Button disabled className="w-full gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading...</Button>,
+    }
+);
+
+interface ReceiptData {
+    id: string;
+    receiptNumber: string;
+    amountPaid: number;
+    paymentMethod?: string;
+    paymentDate: string;
+    invoiceId: string;
+    created_at: string;
+    invoice?: {
+        id: string;
+        invoiceNumber: string;
+        amount: number;
+        projectName: string;
+    };
+}
 
 export default function ReceiptViewPage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
     const { id } = React.use(params);
-    const [receipt, setReceipt] = useState<Receipt | null>(null);
+    const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+    const [companyDetails, setCompanyDetails] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (!id) return;
-        fetch(`/api/receipts/${id}`)
-            .then((res) => {
+        Promise.all([
+            fetch(`/api/receipts/${id}`).then((res) => {
                 if (!res.ok) throw new Error("Not found");
                 return res.json();
-            })
-            .then((data) => {
+            }),
+            fetch("/api/settings").then((r) => r.json()),
+        ])
+            .then(([data, settings]) => {
                 setReceipt(data);
+                setCompanyDetails(settings);
                 setLoading(false);
             })
             .catch(() => {
@@ -49,8 +78,13 @@ export default function ReceiptViewPage({ params }: { params: Promise<{ id: stri
         );
     }
 
-    const handleDownloadPdf = () => {
-        toast.info("PDF download coming soon");
+    const pdfData = {
+        receiptNumber: receipt.receiptNumber,
+        invoiceNumber: receipt.invoice?.invoiceNumber ?? "-",
+        paymentMethod: receipt.paymentMethod ?? "Bank Transfer",
+        paymentDate: new Date(receipt.paymentDate).toLocaleDateString("en-MY", { year: "numeric", month: "long", day: "numeric" }),
+        projectName: receipt.invoice?.projectName ?? "-",
+        amountPaid: receipt.amountPaid,
     };
 
     return (
@@ -134,22 +168,24 @@ export default function ReceiptViewPage({ params }: { params: Promise<{ id: stri
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-between py-3">
-                                <div className="flex items-center gap-3">
-                                    <div className="h-9 w-9 rounded-lg bg-violet-500/10 flex items-center justify-center">
-                                        <FileText className="h-4 w-4 text-violet-500" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-bold uppercase text-muted-foreground">Linked Invoice</p>
-                                        <Link
-                                            href={`/billing/invoices/${receipt.invoiceId}`}
-                                            className="font-medium text-primary hover:underline"
-                                        >
-                                            View Invoice
-                                        </Link>
+                            {receipt.invoice && (
+                                <div className="flex items-center justify-between py-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-9 w-9 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                                            <FileText className="h-4 w-4 text-violet-500" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-bold uppercase text-muted-foreground">Linked Invoice</p>
+                                            <Link
+                                                href={`/billing/invoices/${receipt.invoice.id}`}
+                                                className="font-medium text-primary hover:underline"
+                                            >
+                                                {receipt.invoice.invoiceNumber} — {receipt.invoice.projectName}
+                                            </Link>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
@@ -160,17 +196,24 @@ export default function ReceiptViewPage({ params }: { params: Promise<{ id: stri
                             <CardTitle className="text-base font-bold uppercase tracking-wider text-muted-foreground">Actions</CardTitle>
                         </CardHeader>
                         <CardContent className="pt-6 space-y-3">
-                            <Button
-                                className="w-full gap-2 shadow-lg shadow-primary/25"
-                                onClick={handleDownloadPdf}
+                            <PDFDownloadLink
+                                document={<PdfDocument type="Receipt" data={pdfData} companyDetails={companyDetails} />}
+                                fileName={`Receipt_${receipt.receiptNumber}.pdf`}
                             >
-                                <Download className="h-4 w-4" /> Download PDF
-                            </Button>
-                            <Link href={`/billing/invoices/${receipt.invoiceId}`} className="block">
-                                <Button variant="outline" className="w-full border-primary/20 hover:bg-primary/5 gap-2">
-                                    <FileText className="h-4 w-4" /> View Invoice
-                                </Button>
-                            </Link>
+                                {({ loading: pdfLoading }) => (
+                                    <Button className="w-full gap-2 shadow-lg shadow-primary/25" disabled={pdfLoading}>
+                                        <Download className="h-4 w-4" />
+                                        {pdfLoading ? "Generating..." : "Download Receipt PDF"}
+                                    </Button>
+                                )}
+                            </PDFDownloadLink>
+                            {receipt.invoice && (
+                                <Link href={`/billing/invoices/${receipt.invoice.id}`} className="block">
+                                    <Button variant="outline" className="w-full border-primary/20 hover:bg-primary/5 gap-2">
+                                        <FileText className="h-4 w-4" /> View Invoice
+                                    </Button>
+                                </Link>
+                            )}
                             <Link href="/billing" className="block">
                                 <Button variant="outline" className="w-full border-primary/20 hover:bg-primary/5">
                                     Back to Billing

@@ -9,6 +9,7 @@ import { Project } from "@/types";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { PdfDocument } from "@/lib/pdf-generator";
+import { INVOICE_TC } from "@/lib/billing-presets";
 
 const PDFDownloadLink = dynamic(
   () => import("@react-pdf/renderer").then((mod) => mod.PDFDownloadLink),
@@ -243,7 +244,7 @@ export default function NewInvoicePage() {
                             unitPrice: selectedStage === "Monthly" ? customAmount : selectedStageData.amount,
                           }],
                           total: selectedStage === "Monthly" ? customAmount : selectedStageData.amount,
-                          notes: `Invoice for ${project?.name} - ${selectedStageData.label}`,
+                          notes: INVOICE_TC,
                         }}
                         companyDetails={companyDetails}
                       />

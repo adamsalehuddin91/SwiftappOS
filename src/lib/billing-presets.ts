@@ -9,7 +9,10 @@ export interface BillingPreset {
 }
 
 const BASE_NOTES = (monthly: number) =>
-  `1. Deposit 50% diperlukan sebelum kerja bermula.\n2. Baki 50% selepas sistem go-live.\n3. Tahun seterusnya: RM ${monthly.toLocaleString()}/bulan (hosting + sokongan + kemaskini berterusan).\n4. Sebut harga ini sah selama 30 hari dari tarikh di atas.\n5. Setelah pembayaran diterima, sila hantar bukti bayaran kepada Adam melalui WhatsApp.`;
+  `1. Deposit 50% diperlukan sebelum kerja pembangunan bermula.\n2. Baki 50% dibayar selepas sistem go-live dan diserahkan kepada klien.\n3. Tahun seterusnya: RM ${monthly.toLocaleString()}/bulan (hosting + sokongan + kemaskini berterusan).\n4. Sebut harga ini sah selama 30 hari dari tarikh di atas.\n5. Setelah pembayaran diterima, sila hantar bukti pembayaran kepada Adam melalui WhatsApp.`;
+
+export const INVOICE_TC =
+  `1. Sila hantar bukti pembayaran kepada Adam melalui WhatsApp setelah bayaran dibuat.\n2. Pembayaran melalui pindahan bank ke akaun yang dinyatakan dalam maklumat pembayaran.\n3. Invoice ini hendaklah dijelaskan dalam tempoh 7 hari dari tarikh terbitan.\n4. Untuk sebarang pertanyaan, hubungi Adam melalui WhatsApp atau emel.`;
 
 export const QUOTATION_PRESETS: BillingPreset[] = [
   {

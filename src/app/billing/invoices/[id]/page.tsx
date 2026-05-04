@@ -17,6 +17,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { PdfDocument } from "@/lib/pdf-generator";
+import { INVOICE_TC } from "@/lib/billing-presets";
 import { Invoice, Receipt } from "@/types";
 
 const PDFDownloadLink = dynamic(
@@ -172,7 +173,7 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
       unitPrice: invoice.amount
     }],
     total: invoice.amount,
-    notes: `Payment due for ${invoice.project_name}. Thank you for your business.`,
+    notes: INVOICE_TC,
   };
 
   const statusColors: Record<string, string> = {

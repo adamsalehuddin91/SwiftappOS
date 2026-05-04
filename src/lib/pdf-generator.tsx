@@ -149,18 +149,26 @@ const styles = StyleSheet.create({
     },
     notesBox: {
         marginBottom: 20,
+        backgroundColor: '#fffbf0',
+        borderLeftWidth: 4,
+        borderLeftColor: '#f59e0b',
+        borderLeftStyle: 'solid',
+        padding: 14,
+        borderRadius: 4,
     },
     notesTitle: {
         fontSize: 10,
         fontWeight: 'bold',
-        color: '#64748b',
+        color: '#92400e',
         textTransform: 'uppercase',
-        marginBottom: 4,
+        letterSpacing: 1,
+        marginBottom: 8,
     },
-    notesContent: {
+    notesLine: {
         fontSize: 9,
-        color: '#475569',
-        lineHeight: 1.5,
+        color: '#555',
+        lineHeight: 1.6,
+        marginBottom: 3,
     },
     bankBox: {
         marginBottom: 20,
@@ -455,8 +463,12 @@ export const PdfDocument = ({ type, data, companyDetails }: PdfProps) => {
                     )}
 
                     <View style={styles.notesBox}>
-                        <Text style={styles.notesTitle}>Terms & Conditions</Text>
-                        <Text style={styles.notesContent}>{String(data.notes || 'All payments must be made within the specified terms.')}</Text>
+                        <Text style={styles.notesTitle}>Nota & Syarat</Text>
+                        {String(data.notes || '1. Setelah pembayaran diterima, sila hantar bukti pembayaran kepada Adam melalui WhatsApp.')
+                            .split('\n')
+                            .map((line, i) => (
+                                <Text key={i} style={styles.notesLine}>{line}</Text>
+                            ))}
                     </View>
 
                     <View style={styles.signaturesRow}>

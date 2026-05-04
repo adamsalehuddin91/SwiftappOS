@@ -160,7 +160,7 @@ export default function NewQuotationPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-5">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {QUOTATION_PRESETS.map((preset) => (
               <button
                 key={preset.id}

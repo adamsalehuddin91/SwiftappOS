@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, Zap } from "lucide-react";
 import Link from "next/link";
 import { Project } from "@/types";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { PdfDocument } from "@/lib/pdf-generator";
-import { INVOICE_TC } from "@/lib/billing-presets";
+import { INVOICE_TC, SYSTEM_TYPES, buildInvoiceDescription } from "@/lib/billing-presets";
 
 const PDFDownloadLink = dynamic(
   () => import("@react-pdf/renderer").then((mod) => mod.PDFDownloadLink),
@@ -27,6 +27,7 @@ export default function NewInvoicePage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [customAmount, setCustomAmount] = useState<number>(1000);
+  const [selectedSystemId, setSelectedSystemId] = useState<string>("");
   const [companyDetails, setCompanyDetails] = useState<any>(null);
 
   useEffect(() => {
@@ -52,6 +53,10 @@ export default function NewInvoicePage() {
   ];
 
   const selectedStageData = billingStages.find((s) => s.id === selectedStage);
+  const selectedSystem = SYSTEM_TYPES.find((s) => s.id === selectedSystemId);
+  const itemDescription = selectedStageData && selectedSystem
+    ? buildInvoiceDescription(selectedStageData.id, selectedSystem.short)
+    : selectedStageData?.label || "";
 
   async function handleCreateInvoice() {
     if (!selectedProjectId || !selectedStageData) return;
@@ -66,7 +71,7 @@ export default function NewInvoicePage() {
           amount: selectedStage === "Monthly" ? customAmount : selectedStageData.amount,
           items: [
             {
-              description: selectedStageData.label,
+              description: itemDescription,
               quantity: 1,
               unitPrice: selectedStage === "Monthly" ? customAmount : selectedStageData.amount,
             },
@@ -144,6 +149,51 @@ export default function NewInvoicePage() {
               )}
             </CardContent>
           </Card>
+
+          {project && (
+            <Card className="border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5 animate-in slide-in-from-bottom-4">
+              <CardHeader className="border-b border-border/50 pb-4">
+                <CardTitle className="text-base font-bold flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
+                  <Zap className="h-4 w-4 text-primary" />
+                  Jenis Sistem
+                </CardTitle>
+                <CardDescription>Pilih jenis sistem untuk jana deskripsi item secara automatik.</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-5">
+                <div className="flex flex-wrap gap-2">
+                  {SYSTEM_TYPES.map((sys) => (
+                    <button
+                      key={sys.id}
+                      type="button"
+                      onClick={() => { setSelectedSystemId(sys.id); setSaved(false); }}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors ${
+                        selectedSystemId === sys.id
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "border-primary/30 bg-primary/5 text-primary hover:bg-primary/15"
+                      }`}
+                    >
+                      {sys.label}
+                    </button>
+                  ))}
+                  {selectedSystemId && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSystemId("")}
+                      className="px-3 py-1.5 text-xs font-semibold rounded-full border border-muted-foreground/30 text-muted-foreground hover:bg-secondary/50 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {selectedStageData && selectedSystem && (
+                  <div className="mt-3 p-3 rounded-lg bg-secondary/20 border border-border/50">
+                    <p className="text-xs text-muted-foreground mb-1 font-semibold uppercase tracking-wide">Item Description Preview</p>
+                    <p className="text-sm font-medium text-foreground">{itemDescription}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {project && (
             <Card className="border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5 animate-in slide-in-from-bottom-4">
@@ -239,7 +289,7 @@ export default function NewInvoicePage() {
                           clientEmail: project?.client_email || "billing@client.com",
                           clientBrn: project?.client_brn,
                           items: [{
-                            description: selectedStageData.label,
+                            description: itemDescription,
                             quantity: 1,
                             unitPrice: selectedStage === "Monthly" ? customAmount : selectedStageData.amount,
                           }],

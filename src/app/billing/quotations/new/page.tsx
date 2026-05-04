@@ -104,6 +104,11 @@ function NewQuotationPageInner() {
       toast.error("At least one line item is required");
       return;
     }
+    const emptyDescIdx = items.findIndex(i => !i.description.trim());
+    if (emptyDescIdx !== -1) {
+      toast.error(`Item #${emptyDescIdx + 1} description cannot be empty`);
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch("/api/quotations", {
@@ -128,7 +133,12 @@ function NewQuotationPageInner() {
         if (data?.id) router.push(`/billing/quotations/${data.id}`);
       } else {
         const err = await res.json().catch(() => null);
-        toast.error(err?.error || "Failed to save quotation");
+        const msg = typeof err?.error === "string"
+          ? err.error
+          : err?.error?.fieldErrors
+            ? Object.entries(err.error.fieldErrors).map(([k, v]) => `${k}: ${(v as string[]).join(", ")}`).join(" | ")
+            : "Failed to save quotation";
+        toast.error(msg);
       }
     } catch {
       toast.error("Network error — could not save quotation");

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
 import { mapInvoice } from "@/lib/mappers";
 import { getNextNumber } from "@/lib/sequences";
 
@@ -46,22 +47,24 @@ export async function POST(
 
     const invoiceNumber = await getNextNumber("invoice");
 
+    const invoiceData: Prisma.InvoiceUncheckedCreateInput = {
+      invoiceNumber,
+      projectId: quotation.projectId ?? undefined,
+      type: billingType,
+      amount: invoiceAmount,
+      items: [{
+        description: `${stageLabels[billingType]} — ${firstItemTitle}`,
+        quantity: 1,
+        unitPrice: invoiceAmount,
+      }],
+      clientName: quotation.clientName,
+      clientEmail: quotation.clientEmail,
+      clientBrn: quotation.clientBrn,
+      notes: quotation.notes,
+    };
+
     const invoice = await prisma.invoice.create({
-      data: {
-        invoiceNumber,
-        ...(quotation.projectId ? { project: { connect: { id: quotation.projectId } } } : {}),
-        type: billingType,
-        amount: invoiceAmount,
-        items: [{
-          description: `${stageLabels[billingType]} — ${firstItemTitle}`,
-          quantity: 1,
-          unitPrice: invoiceAmount,
-        }],
-        clientName: quotation.clientName,
-        clientEmail: quotation.clientEmail,
-        clientBrn: quotation.clientBrn,
-        notes: quotation.notes,
-      },
+      data: invoiceData,
       include: { project: true },
     });
 

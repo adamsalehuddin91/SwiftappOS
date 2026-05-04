@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ArrowLeft, CheckCircle2, Loader2, Zap } from "lucide-react";
@@ -19,7 +20,8 @@ const PDFDownloadLink = dynamic(
   }
 );
 
-export default function NewInvoicePage() {
+function NewInvoicePageInner() {
+  const searchParams = useSearchParams();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
@@ -31,9 +33,17 @@ export default function NewInvoicePage() {
   const [companyDetails, setCompanyDetails] = useState<any>(null);
 
   useEffect(() => {
+    const projectIdFromUrl = searchParams.get("projectId");
+
     fetch("/api/projects")
       .then((r) => r.json())
-      .then((data) => setProjects(Array.isArray(data) ? data : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : [];
+        setProjects(list);
+        if (projectIdFromUrl && list.some((p: Project) => p.id === projectIdFromUrl)) {
+          setSelectedProjectId(projectIdFromUrl);
+        }
+      })
       .catch(() => toast.error("Failed to load projects"))
       .finally(() => setLoading(false));
 
@@ -41,7 +51,7 @@ export default function NewInvoicePage() {
       .then((r) => r.json())
       .then((data) => setCompanyDetails(data))
       .catch((err) => console.error("Error fetching settings:", err));
-  }, []);
+  }, [searchParams]);
 
   const project = projects.find((p) => p.id === selectedProjectId);
 
@@ -319,5 +329,13 @@ export default function NewInvoicePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function NewInvoicePage() {
+  return (
+    <Suspense>
+      <NewInvoicePageInner />
+    </Suspense>
   );
 }

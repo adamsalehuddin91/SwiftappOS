@@ -10,6 +10,7 @@ import TimeLogger from "./time-logger";
 import CostTracker from "./cost-tracker";
 import EditProjectDialog from "./edit-project-dialog";
 import ArchiveButton from "./archive-button";
+import EditMilestoneDialog from "../edit-milestone-dialog";
 
 const milestoneStatusMap: Record<string, string> = {
   Pending: "Pending",
@@ -192,6 +193,7 @@ export default async function ProjectDetailPage({
                         }`}>
                         {milestone.displayStatus}
                       </span>
+                      <EditMilestoneDialog milestone={milestone as unknown as import("@/types").Milestone} />
                       <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                     </div>
                   </div>
@@ -225,12 +227,12 @@ export default async function ProjectDetailPage({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 pt-4">
-              <Link href="/billing/quotations/new" className="block w-full">
+              <Link href={`/billing/quotations/new?projectId=${project.id}`} className="block w-full">
                 <Button className="w-full justify-start gap-2 h-11" variant="outline">
                   <FileText className="h-4 w-4 text-primary" /> Generate Quotation
                 </Button>
               </Link>
-              <Link href="/billing/invoices/new" className="block w-full">
+              <Link href={`/billing/invoices/new?projectId=${project.id}`} className="block w-full">
                 <Button className="w-full justify-start gap-2 h-11" variant="outline">
                   <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Create Invoice
                 </Button>

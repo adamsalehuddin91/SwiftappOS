@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,8 +30,9 @@ interface QuotationItem {
   unitPrice: number;
 }
 
-export default function NewQuotationPage() {
+function NewQuotationPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const [items, setItems] = useState<QuotationItem[]>([
     { id: 1, description: "", quantity: 1, unitPrice: 0 },
@@ -52,7 +54,19 @@ export default function NewQuotationPage() {
       .then(res => res.json())
       .then(data => setCompanyDetails(data))
       .catch(() => toast.error("Failed to load company settings"));
-  }, []);
+
+    const projectId = searchParams.get("projectId");
+    if (projectId) {
+      fetch(`/api/projects/${projectId}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data?.client_name) setClientName(data.client_name);
+          if (data?.client_email) setClientEmail(data.client_email);
+          if (data?.client_brn) setClientBrn(data.client_brn);
+        })
+        .catch(() => {});
+    }
+  }, [searchParams]);
 
   const applyPreset = (presetId: string) => {
     const preset = QUOTATION_PRESETS.find(p => p.id === presetId);
@@ -409,5 +423,13 @@ export default function NewQuotationPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function NewQuotationPage() {
+  return (
+    <Suspense>
+      <NewQuotationPageInner />
+    </Suspense>
   );
 }

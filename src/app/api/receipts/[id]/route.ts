@@ -31,7 +31,7 @@ export async function GET(
         id: receipt.invoice.id,
         invoiceNumber: receipt.invoice.invoiceNumber,
         amount: Number(receipt.invoice.amount),
-        projectName: receipt.invoice.project.name,
+        projectName: receipt.invoice.project?.name ?? "-",
       },
     });
   } catch (error) {

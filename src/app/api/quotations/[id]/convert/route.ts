@@ -49,7 +49,7 @@ export async function POST(
     const invoice = await prisma.invoice.create({
       data: {
         invoiceNumber,
-        projectId: quotation.projectId ?? undefined,
+        ...(quotation.projectId ? { project: { connect: { id: quotation.projectId } } } : {}),
         type: billingType,
         amount: invoiceAmount,
         items: [{

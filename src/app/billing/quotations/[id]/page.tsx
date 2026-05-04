@@ -28,6 +28,8 @@ export default function QuotationViewPage({ params }: { params: Promise<{ id: st
     const [updating, setUpdating] = useState(false);
     const [converting, setConverting] = useState(false);
     const [duplicating, setDuplicating] = useState(false);
+    const [convertStage, setConvertStage] = useState<"Deposit" | "Progress" | "Final" | "Monthly">("Deposit");
+    const [convertCustomAmount, setConvertCustomAmount] = useState("");
 
     useEffect(() => {
         if (!id) return;
@@ -77,13 +79,25 @@ export default function QuotationViewPage({ params }: { params: Promise<{ id: st
     const handleConvertToInvoice = async () => {
         if (!quotation) return;
         setConverting(true);
+        const total = quotation.total_amount;
+        const autoAmounts: Record<string, number> = {
+            Deposit:  Math.round(total * 0.5 * 100) / 100,
+            Progress: Math.round(total * 0.25 * 100) / 100,
+            Final:    Math.round(total * 0.5 * 100) / 100,
+            Monthly:  0,
+        };
+        const amount = convertStage === "Monthly"
+            ? parseFloat(convertCustomAmount) || 0
+            : autoAmounts[convertStage];
         try {
             const res = await fetch(`/api/quotations/${quotation.id}/convert`, {
                 method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ type: convertStage, amount }),
             });
             if (res.ok) {
                 const data = await res.json();
-                toast.success("Quotation converted to invoice");
+                toast.success("Invoice created successfully");
                 router.push(`/billing/invoices/${data.id}`);
             } else {
                 const err = await res.json().catch(() => null);
@@ -305,17 +319,57 @@ export default function QuotationViewPage({ params }: { params: Promise<{ id: st
                             </Button>
 
                             {quotation.status === "Accepted" && (
-                                <Button
-                                    className="w-full justify-start gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/25"
-                                    disabled={converting}
-                                    onClick={handleConvertToInvoice}
-                                >
-                                    {converting ? (
-                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Converting...</>
-                                    ) : (
-                                        <><FileText className="mr-2 h-4 w-4" /> Convert to Invoice <ArrowRight className="ml-auto h-4 w-4" /></>
+                                <div className="space-y-3 pt-1 pb-1 border border-emerald-500/30 rounded-xl p-3 bg-emerald-500/5">
+                                    <p className="text-xs font-bold uppercase tracking-wider text-emerald-600">Convert to Invoice</p>
+                                    <div className="grid grid-cols-2 gap-1.5">
+                                        {(["Deposit", "Progress", "Final", "Monthly"] as const).map((stage) => {
+                                            const labels: Record<string, string> = { Deposit: "Deposit 50%", Progress: "Progress 25%", Final: "Baki 50%", Monthly: "Bulanan" };
+                                            const amounts: Record<string, number> = {
+                                                Deposit: Math.round(quotation.total_amount * 0.5 * 100) / 100,
+                                                Progress: Math.round(quotation.total_amount * 0.25 * 100) / 100,
+                                                Final: Math.round(quotation.total_amount * 0.5 * 100) / 100,
+                                                Monthly: 0,
+                                            };
+                                            return (
+                                                <button
+                                                    key={stage}
+                                                    type="button"
+                                                    onClick={() => setConvertStage(stage)}
+                                                    className={`rounded-lg border px-2 py-2 text-left transition-all ${
+                                                        convertStage === stage
+                                                            ? "border-emerald-500 bg-emerald-500/15 text-emerald-700"
+                                                            : "border-border/50 bg-secondary/20 text-muted-foreground hover:bg-secondary/40"
+                                                    }`}
+                                                >
+                                                    <div className="text-xs font-bold">{labels[stage]}</div>
+                                                    {stage !== "Monthly" && (
+                                                        <div className="text-[10px] opacity-70">RM {amounts[stage].toLocaleString()}</div>
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    {convertStage === "Monthly" && (
+                                        <input
+                                            type="number"
+                                            placeholder="Jumlah bulanan (RM)"
+                                            value={convertCustomAmount}
+                                            onChange={(e) => setConvertCustomAmount(e.target.value)}
+                                            className="flex h-9 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                        />
                                     )}
-                                </Button>
+                                    <Button
+                                        className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/25"
+                                        disabled={converting}
+                                        onClick={handleConvertToInvoice}
+                                    >
+                                        {converting ? (
+                                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...</>
+                                        ) : (
+                                            <><FileText className="mr-2 h-4 w-4" /> Jana Invoice <ArrowRight className="ml-auto h-4 w-4" /></>
+                                        )}
+                                    </Button>
+                                </div>
                             )}
 
                             <div className="pt-4 border-t border-border/50 space-y-2">

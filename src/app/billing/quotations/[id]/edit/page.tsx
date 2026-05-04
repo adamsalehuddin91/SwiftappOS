@@ -223,45 +223,49 @@ export default function EditQuotationPage({ params }: { params: Promise<{ id: st
                         </CardHeader>
                         <CardContent className="pt-6 space-y-4">
                             {items.map((item) => (
-                                <div key={item.id} className="grid grid-cols-12 gap-4 items-end bg-secondary/10 p-4 rounded-xl border border-border/50">
-                                    <div className="col-span-6">
-                                        <Label className="text-xs mb-1.5 block text-muted-foreground">Description</Label>
-                                        <Input
-                                            value={item.description}
-                                            onChange={(e) => updateItem(item.id, "description", e.target.value)}
-                                            placeholder="Item description"
-                                            className="bg-secondary/20 border-border/50 h-9"
-                                        />
+                                <div key={item.id} className="space-y-3 bg-secondary/10 p-4 rounded-xl border border-border/50">
+                                    <div className="grid grid-cols-12 gap-3 items-end">
+                                        <div className="col-span-11">
+                                            <Label className="text-xs mb-1.5 block text-muted-foreground">Description</Label>
+                                            <Textarea
+                                                value={item.description}
+                                                onChange={(e) => updateItem(item.id, "description", e.target.value)}
+                                                placeholder="Nama + penerangan perkhidmatan"
+                                                className="bg-secondary/20 border-border/50 min-h-[120px] text-sm leading-relaxed"
+                                            />
+                                        </div>
+                                        <div className="col-span-1 pb-1">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-red-500 hover:text-red-400 hover:bg-red-500/10 h-9 w-9"
+                                                onClick={() => removeItem(item.id)}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     </div>
-                                    <div className="col-span-2">
-                                        <Label className="text-xs mb-1.5 block text-muted-foreground">Qty</Label>
-                                        <Input
-                                            type="number"
-                                            value={item.quantity}
-                                            onChange={(e) => updateItem(item.id, "quantity", Number(e.target.value))}
-                                            min={1}
-                                            className="bg-secondary/20 border-border/50 h-9"
-                                        />
-                                    </div>
-                                    <div className="col-span-3">
-                                        <Label className="text-xs mb-1.5 block text-muted-foreground">Unit Price (RM)</Label>
-                                        <Input
-                                            type="number"
-                                            value={item.unitPrice}
-                                            onChange={(e) => updateItem(item.id, "unitPrice", Number(e.target.value))}
-                                            min={0}
-                                            className="bg-secondary/20 border-border/50 h-9"
-                                        />
-                                    </div>
-                                    <div className="col-span-1">
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="text-red-500 hover:text-red-400 hover:bg-red-500/10 h-9 w-9"
-                                            onClick={() => removeItem(item.id)}
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <Label className="text-xs mb-1.5 block text-muted-foreground">Qty</Label>
+                                            <Input
+                                                type="number"
+                                                value={item.quantity}
+                                                onChange={(e) => updateItem(item.id, "quantity", Number(e.target.value))}
+                                                min={1}
+                                                className="bg-secondary/20 border-border/50 h-9"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs mb-1.5 block text-muted-foreground">Unit Price (RM)</Label>
+                                            <Input
+                                                type="number"
+                                                value={item.unitPrice}
+                                                onChange={(e) => updateItem(item.id, "unitPrice", Number(e.target.value))}
+                                                min={0}
+                                                className="bg-secondary/20 border-border/50 h-9"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             ))}

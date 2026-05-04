@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, Loader2, Save } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Zap } from "lucide-react";
 import Link from "next/link";
 
 export default function NewMilestonePage({
@@ -22,9 +22,18 @@ export default function NewMilestonePage({
     const [formData, setFormData] = useState({
         name: "",
         description: "",
-        amount: "0",
+        amount: "",
         dueDate: "",
     });
+
+    const MILESTONE_PRESETS = [
+        { label: "Deposit 50%", name: "Bayaran Deposit — Mula Pembangunan", description: "50% deposit dibayar sebelum kerja pembangunan bermula.", amount: "" },
+        { label: "Go-Live 50%", name: "Bayaran Akhir — Sistem Go-Live", description: "Baki 50% dibayar selepas sistem siap, diuji dan diserahkan kepada klien.", amount: "" },
+        { label: "Progress 25%", name: "Bayaran Progres — Pertengahan Pembangunan", description: "25% mid-project payment selepas core features siap dan demo kepada klien.", amount: "" },
+        { label: "Monthly RM280", name: "Bayaran Bulanan — Hosting + Sokongan", description: "Bayaran bulanan merangkumi hosting, domain, sokongan teknikal dan kemaskini sistem.", amount: "280" },
+        { label: "Monthly RM200", name: "Bayaran Bulanan — Pakej Basic", description: "Bayaran bulanan pakej basic merangkumi hosting, domain dan sokongan teknikal.", amount: "200" },
+        { label: "Monthly RM350", name: "Bayaran Bulanan — Pakej Pro", description: "Bayaran bulanan pakej pro merangkumi hosting, domain, sokongan teknikal dan laporan tersuai.", amount: "350" },
+    ];
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -88,6 +97,32 @@ export default function NewMilestonePage({
                 </CardHeader>
                 <CardContent className="pt-6">
                     <form onSubmit={handleSubmit} className="space-y-6">
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                                <Zap className="h-4 w-4 text-primary" />
+                                <span className="text-sm font-medium text-muted-foreground">Quick Fill</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {MILESTONE_PRESETS.map((preset) => (
+                                    <button
+                                        key={preset.label}
+                                        type="button"
+                                        onClick={() =>
+                                            setFormData((prev) => ({
+                                                ...prev,
+                                                name: preset.name,
+                                                description: preset.description,
+                                                amount: preset.amount,
+                                            }))
+                                        }
+                                        className="px-3 py-1.5 text-xs font-medium rounded-full border border-primary/30 bg-primary/5 text-primary hover:bg-primary/15 hover:border-primary/50 transition-colors"
+                                    >
+                                        {preset.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
                         <div className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="name">Milestone Name <span className="text-red-500">*</span></Label>

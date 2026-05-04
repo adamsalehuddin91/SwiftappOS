@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Trash2, Plus, Download, FileText, User, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowLeft, Trash2, Plus, Download, FileText, User, CheckCircle2, Loader2, Phone, Calendar } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -35,9 +35,11 @@ export default function NewQuotationPage() {
   ]);
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
   const [clientBrn, setClientBrn] = useState("");
+  const [validDays, setValidDays] = useState("30");
   const [notes, setNotes] = useState(
-    "1. 50% Deposit required to commence work.\n2. Balance 50% upon completion.\n3. Quotation valid for 14 days."
+    "1. 50% Deposit required to commence work.\n2. Balance 50% upon completion.\n3. Quotation valid for 30 days."
   );
   const [isClient, setIsClient] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -92,6 +94,7 @@ export default function NewQuotationPage() {
         body: JSON.stringify({
           clientName,
           clientEmail: clientEmail || undefined,
+          clientPhone: clientPhone || undefined,
           clientBrn: clientBrn || undefined,
           items: items.map(({ description, quantity, unitPrice }) => ({
             description,
@@ -99,6 +102,9 @@ export default function NewQuotationPage() {
             unitPrice,
           })),
           notes,
+          validUntil: validDays
+            ? new Date(Date.now() + Number(validDays) * 86400000).toISOString().split("T")[0]
+            : undefined,
         }),
       });
       if (res.ok) {
@@ -122,11 +128,15 @@ export default function NewQuotationPage() {
   const pdfData = {
     number: "SWIFT/QT/DRAFT",
     clientName: clientName || "Client Name",
-    clientEmail: clientEmail || "email@example.com",
+    clientEmail: clientEmail || "",
+    clientPhone: clientPhone || "",
     clientBrn: clientBrn,
     items: items,
     total: calculateTotal(),
     notes,
+    validUntil: validDays
+      ? new Date(Date.now() + Number(validDays) * 86400000).toISOString().split("T")[0]
+      : undefined,
   };
 
   return (
@@ -175,25 +185,54 @@ export default function NewQuotationPage() {
                   className="bg-secondary/20 border-border/50 focus:border-primary/50"
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="clientBrn">Business Registration Number (BRN)</Label>
-                <Input
-                  id="clientBrn"
-                  placeholder="Optional Client BRN"
-                  value={clientBrn}
-                  onChange={(e) => setClientBrn(e.target.value)}
-                  className="bg-secondary/20 border-border/50 focus:border-primary/50"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="clientPhone" className="flex items-center gap-1.5"><Phone className="h-3 w-3 text-primary" />Phone</Label>
+                  <Input
+                    id="clientPhone"
+                    placeholder="011-xxxx xxxx"
+                    value={clientPhone}
+                    onChange={(e) => setClientPhone(e.target.value)}
+                    className="bg-secondary/20 border-border/50 focus:border-primary/50"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="clientBrn">BRN (Optional)</Label>
+                  <Input
+                    id="clientBrn"
+                    placeholder="Company BRN"
+                    value={clientBrn}
+                    onChange={(e) => setClientBrn(e.target.value)}
+                    className="bg-secondary/20 border-border/50 focus:border-primary/50"
+                  />
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="clientEmail">Email (Optional)</Label>
-                <Input
-                  id="clientEmail"
-                  placeholder="client@example.com"
-                  value={clientEmail}
-                  onChange={(e) => setClientEmail(e.target.value)}
-                  className="bg-secondary/20 border-border/50 focus:border-primary/50"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="clientEmail">Email (Optional)</Label>
+                  <Input
+                    id="clientEmail"
+                    placeholder="client@example.com"
+                    value={clientEmail}
+                    onChange={(e) => setClientEmail(e.target.value)}
+                    className="bg-secondary/20 border-border/50 focus:border-primary/50"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="validDays" className="flex items-center gap-1.5"><Calendar className="h-3 w-3 text-primary" />Valid For</Label>
+                  <select
+                    id="validDays"
+                    value={validDays}
+                    onChange={(e) => setValidDays(e.target.value)}
+                    className="h-10 rounded-md border border-border/50 bg-secondary/20 px-3 text-sm focus:border-primary/50 focus:outline-none"
+                  >
+                    <option value="7">7 days</option>
+                    <option value="14">14 days</option>
+                    <option value="30">30 days</option>
+                    <option value="60">60 days</option>
+                    <option value="90">90 days</option>
+                  </select>
+                </div>
               </div>
             </CardContent>
           </Card>

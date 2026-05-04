@@ -334,7 +334,7 @@ export const PdfDocument = ({ type, data, companyDetails }: PdfProps) => {
     const sstAmount = hasSST ? subtotal * sstRate : 0;
     const grandTotal = hasSST ? subtotal + sstAmount : subtotal;
 
-    const showBankDetails = type === 'Invoice' && (companyDetails?.bankName || companyDetails?.bankAccount);
+    const showBankDetails = (type === 'Invoice' || type === 'Quotation') && (companyDetails?.bankName || companyDetails?.bankAccount);
 
     return (
         <Document>
@@ -373,6 +373,12 @@ export const PdfDocument = ({ type, data, companyDetails }: PdfProps) => {
                                     <Text style={styles.docInfoValue}>C.O.D</Text>
                                 </View>
                             )}
+                            {type === 'Quotation' && data.validUntil && (
+                                <View style={styles.docInfoRow}>
+                                    <Text style={styles.docInfoLabel}>Valid Until</Text>
+                                    <Text style={styles.docInfoValue}>{String(data.validUntil)}</Text>
+                                </View>
+                            )}
                         </View>
                     </View>
                 </View>
@@ -381,10 +387,15 @@ export const PdfDocument = ({ type, data, companyDetails }: PdfProps) => {
                     <View style={styles.clientBlock}>
                         <Text style={styles.sectionLabel}>{type === 'Invoice' ? 'Bill To:' : 'Quotation For:'}</Text>
                         <Text style={styles.clientName}>{String(data.clientName || 'Valued Client')}</Text>
+                        {data.clientPhone && (
+                            <Text style={{ fontSize: 9, color: '#475569', marginBottom: 2 }}>Tel: {String(data.clientPhone)}</Text>
+                        )}
                         {data.clientBrn && (
                             <Text style={{ fontSize: 9, color: '#475569', marginBottom: 2 }}>BRN: {String(data.clientBrn)}</Text>
                         )}
-                        <Text style={{ fontSize: 9, color: '#475569' }}>{String(data.clientEmail || '')}</Text>
+                        {data.clientEmail && (
+                            <Text style={{ fontSize: 9, color: '#475569', marginBottom: 2 }}>{String(data.clientEmail)}</Text>
+                        )}
                     </View>
                 </View>
 

@@ -139,10 +139,12 @@ export default function QuotationViewPage({ params }: { params: Promise<{ id: st
         number: quotation.quotation_number,
         clientName: quotation.client_name,
         clientEmail: quotation.client_email || "",
+        clientPhone: quotation.client_phone || "",
         clientBrn: quotation.client_brn || "",
         items: quotation.items,
         total: quotation.total_amount,
         notes: quotation.notes || "",
+        validUntil: quotation.valid_until || "",
     };
 
     const statusColors = {
@@ -189,6 +191,12 @@ export default function QuotationViewPage({ params }: { params: Promise<{ id: st
                                 <span className="text-muted-foreground">Name:</span>
                                 <span className="font-medium text-foreground">{quotation.client_name}</span>
                             </div>
+                            {quotation.client_phone && (
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Phone:</span>
+                                    <span className="font-medium text-foreground">{quotation.client_phone}</span>
+                                </div>
+                            )}
                             {quotation.client_email && (
                                 <div className="flex justify-between">
                                     <span className="text-muted-foreground">Email:</span>

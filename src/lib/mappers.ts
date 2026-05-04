@@ -74,6 +74,7 @@ export function mapQuotation(q: PrismaQuotation): Quotation {
     client_name: q.clientName,
     client_email: q.clientEmail ?? undefined,
     client_brn: q.clientBrn ?? undefined,
+    client_phone: q.clientPhone ?? undefined,
     items: (q.items as unknown) as QuotationItem[],
     total_amount: Number(q.totalAmount),
     status: q.status,

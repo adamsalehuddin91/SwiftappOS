@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Trash2, Plus, FileText, User, Loader2, Save } from "lucide-react";
+import { ArrowLeft, Trash2, Plus, FileText, User, Loader2, Save, Phone } from "lucide-react";
 import Link from "next/link";
 import { Quotation } from "@/types";
 import { toast } from "sonner";
@@ -26,6 +26,7 @@ export default function EditQuotationPage({ params }: { params: Promise<{ id: st
     const [saving, setSaving] = useState(false);
     const [clientName, setClientName] = useState("");
     const [clientEmail, setClientEmail] = useState("");
+    const [clientPhone, setClientPhone] = useState("");
     const [clientBrn, setClientBrn] = useState("");
     const [notes, setNotes] = useState("");
     const [validUntil, setValidUntil] = useState("");
@@ -43,6 +44,7 @@ export default function EditQuotationPage({ params }: { params: Promise<{ id: st
                 }
                 setClientName(data.client_name);
                 setClientEmail(data.client_email || "");
+                setClientPhone(data.client_phone || "");
                 setClientBrn(data.client_brn || "");
                 setNotes(data.notes || "");
                 setValidUntil(data.valid_until ? data.valid_until.slice(0, 10) : "");
@@ -95,6 +97,7 @@ export default function EditQuotationPage({ params }: { params: Promise<{ id: st
                 body: JSON.stringify({
                     clientName,
                     clientEmail: clientEmail || undefined,
+                    clientPhone: clientPhone || undefined,
                     clientBrn: clientBrn || undefined,
                     items: items.map(({ description, quantity, unitPrice }) => ({
                         description,
@@ -161,35 +164,49 @@ export default function EditQuotationPage({ params }: { params: Promise<{ id: st
                                     className="bg-secondary/20 border-border/50 focus:border-primary/50"
                                 />
                             </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="clientBrn">Business Registration Number (BRN)</Label>
-                                <Input
-                                    id="clientBrn"
-                                    placeholder="Optional Client BRN"
-                                    value={clientBrn}
-                                    onChange={(e) => setClientBrn(e.target.value)}
-                                    className="bg-secondary/20 border-border/50 focus:border-primary/50"
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="clientPhone" className="flex items-center gap-1.5"><Phone className="h-3 w-3 text-primary" />Phone</Label>
+                                    <Input
+                                        id="clientPhone"
+                                        placeholder="011-xxxx xxxx"
+                                        value={clientPhone}
+                                        onChange={(e) => setClientPhone(e.target.value)}
+                                        className="bg-secondary/20 border-border/50 focus:border-primary/50"
+                                    />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="clientBrn">BRN (Optional)</Label>
+                                    <Input
+                                        id="clientBrn"
+                                        placeholder="Company BRN"
+                                        value={clientBrn}
+                                        onChange={(e) => setClientBrn(e.target.value)}
+                                        className="bg-secondary/20 border-border/50 focus:border-primary/50"
+                                    />
+                                </div>
                             </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="clientEmail">Email (Optional)</Label>
-                                <Input
-                                    id="clientEmail"
-                                    placeholder="client@example.com"
-                                    value={clientEmail}
-                                    onChange={(e) => setClientEmail(e.target.value)}
-                                    className="bg-secondary/20 border-border/50 focus:border-primary/50"
-                                />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="validUntil">Valid Until</Label>
-                                <Input
-                                    id="validUntil"
-                                    type="date"
-                                    value={validUntil}
-                                    onChange={(e) => setValidUntil(e.target.value)}
-                                    className="bg-secondary/20 border-border/50 focus:border-primary/50"
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="clientEmail">Email (Optional)</Label>
+                                    <Input
+                                        id="clientEmail"
+                                        placeholder="client@example.com"
+                                        value={clientEmail}
+                                        onChange={(e) => setClientEmail(e.target.value)}
+                                        className="bg-secondary/20 border-border/50 focus:border-primary/50"
+                                    />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="validUntil">Valid Until</Label>
+                                    <Input
+                                        id="validUntil"
+                                        type="date"
+                                        value={validUntil}
+                                        onChange={(e) => setValidUntil(e.target.value)}
+                                        className="bg-secondary/20 border-border/50 focus:border-primary/50"
+                                    />
+                                </div>
                             </div>
                         </CardContent>
                     </Card>

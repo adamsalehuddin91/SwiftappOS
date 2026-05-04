@@ -60,6 +60,7 @@ export async function PUT(
         ...(data.clientName !== undefined && { clientName: data.clientName }),
         ...(data.clientEmail !== undefined && { clientEmail: data.clientEmail || null }),
         ...(data.clientBrn !== undefined && { clientBrn: data.clientBrn }),
+        ...(data.clientPhone !== undefined && { clientPhone: data.clientPhone }),
         ...(data.items !== undefined && { items: data.items }),
         ...(totalAmount !== undefined && { totalAmount }),
         ...(data.notes !== undefined && { notes: data.notes }),

@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
         clientName: data.clientName,
         clientEmail: data.clientEmail || null,
         clientBrn: data.clientBrn ?? null,
+        clientPhone: data.clientPhone ?? null,
         items: data.items,
         totalAmount,
         notes: data.notes ?? null,

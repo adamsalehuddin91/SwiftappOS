@@ -70,6 +70,7 @@ export interface Quotation {
   client_name: string;
   client_email?: string;
   client_brn?: string;
+  client_phone?: string;
   items: QuotationItem[];
   total_amount: number;
   status: "Draft" | "Sent" | "Accepted" | "Rejected";

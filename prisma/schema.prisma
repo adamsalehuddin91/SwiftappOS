@@ -100,6 +100,7 @@ model Quotation {
   clientName      String          @map("client_name")
   clientEmail     String?         @map("client_email")
   clientBrn       String?         @map("client_brn")
+  clientPhone     String?         @map("client_phone")
   items           Json            @default("[]")
   totalAmount     Decimal         @default(0) @map("total_amount") @db.Decimal(10, 2)
   status          QuotationStatus @default(Draft)

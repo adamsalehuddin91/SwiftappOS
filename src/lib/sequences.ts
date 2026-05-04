@@ -4,9 +4,10 @@ export async function getNextNumber(type: "invoice" | "quotation" | "receipt"): 
   const year = new Date().getFullYear();
 
   const result = await prisma.$transaction(async (tx) => {
-    const seq = await tx.sequence.update({
+    const seq = await tx.sequence.upsert({
       where: { id: type },
-      data: { lastValue: { increment: 1 } },
+      update: { lastValue: { increment: 1 } },
+      create: { id: type, lastValue: 1 },
     });
     return seq.lastValue;
   });

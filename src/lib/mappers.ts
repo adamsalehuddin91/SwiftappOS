@@ -48,7 +48,7 @@ export function mapInvoice(
 ): Invoice {
   return {
     id: inv.id,
-    project_id: inv.projectId,
+    project_id: inv.projectId ?? undefined,
     milestone_id: inv.milestoneId ?? undefined,
     invoice_number: inv.invoiceNumber,
     type: inv.type,

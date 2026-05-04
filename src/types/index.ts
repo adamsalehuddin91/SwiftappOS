@@ -45,7 +45,7 @@ export type InvoiceType = "Deposit" | "Progress" | "Final" | "Monthly";
 
 export interface Invoice {
   id: string;
-  project_id: string;
+  project_id?: string;
   milestone_id?: string;
   invoice_number: string;
   type: InvoiceType;

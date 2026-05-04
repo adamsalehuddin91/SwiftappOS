@@ -49,7 +49,7 @@ export async function POST(
 
     const invoiceData: Prisma.InvoiceUncheckedCreateInput = {
       invoiceNumber,
-      projectId: quotation.projectId ?? undefined,
+      ...(quotation.projectId ? { projectId: quotation.projectId } : {}),
       type: billingType,
       amount: invoiceAmount,
       items: [{

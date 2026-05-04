@@ -56,7 +56,7 @@ export async function GET() {
         invoiceNumber: inv.invoiceNumber,
         amount: Number(inv.amount),
         dueDate: inv.dueDate?.toISOString() ?? null,
-        projectName: inv.project.name,
+        projectName: inv.project?.name ?? "-",
         daysPastDue: inv.dueDate
           ? Math.floor((Date.now() - inv.dueDate.getTime()) / (1000 * 60 * 60 * 24))
           : 0,

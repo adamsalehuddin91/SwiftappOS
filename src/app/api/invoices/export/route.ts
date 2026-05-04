@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const rows = invoices.map((inv) =>
       [
         inv.invoiceNumber,
-        `"${inv.project.name}"`,
+        `"${inv.project?.name ?? "-"}"`,
         inv.type,
         Number(inv.amount).toFixed(2),
         inv.status,

@@ -49,6 +49,7 @@ export default async function ProjectDetailPage({
   const totalValue = milestones.reduce((acc, m) => acc + m.amount, 0);
   const totalCosts = project.costs.reduce((acc, c) => acc + Number(c.amount), 0);
   const netProfit = totalValue - totalCosts;
+  const totalHours = project.timeLogs.reduce((acc, t) => acc + Number(t.hours), 0);
 
   const totalMilestones = milestones.length;
   const completedMilestones = milestones.filter(
@@ -106,8 +107,16 @@ export default async function ProjectDetailPage({
             </span>
             <div className="h-4 w-px bg-border hidden sm:block"></div>
             <span className="text-xs font-bold text-emerald-500 uppercase tracking-wider flex items-center gap-1">
-              Net Profit: RM {netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              Contract Value: RM {netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </span>
+            {totalHours > 0 && (
+              <>
+                <div className="h-4 w-px bg-border hidden sm:block"></div>
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Clock className="h-3 w-3" /> {totalHours} hrs logged
+                </span>
+              </>
+            )}
           </div>
         </div>
       </div>

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Download, Loader2, Receipt as ReceiptIcon, FileText, Calendar, CreditCard, Hash, ExternalLink, User } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Receipt as ReceiptIcon, FileText, Calendar, CreditCard, Hash, ExternalLink, User, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
@@ -42,6 +42,7 @@ export default function ReceiptViewPage({ params }: { params: Promise<{ id: stri
     const [receipt, setReceipt] = useState<ReceiptData | null>(null);
     const [companyDetails, setCompanyDetails] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [voiding, setVoiding] = useState(false);
 
     useEffect(() => {
         if (!id) return;
@@ -62,6 +63,25 @@ export default function ReceiptViewPage({ params }: { params: Promise<{ id: stri
                 setLoading(false);
             });
     }, [id]);
+
+    const handleVoid = async () => {
+        if (!confirm("Void this receipt? This will revert the invoice status if needed.")) return;
+        setVoiding(true);
+        try {
+            const res = await fetch(`/api/receipts/${id}`, { method: "DELETE" });
+            if (res.ok) {
+                toast.success("Receipt voided.");
+                router.push(receipt?.invoice ? `/billing/invoices/${receipt.invoice.id}` : "/billing");
+            } else {
+                const err = await res.json().catch(() => null);
+                toast.error(err?.error || "Failed to void receipt.");
+            }
+        } catch {
+            toast.error("Network error.");
+        } finally {
+            setVoiding(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -238,6 +258,15 @@ export default function ReceiptViewPage({ params }: { params: Promise<{ id: stri
                                     <FileText className="h-4 w-4" /> Back to Billing
                                 </Button>
                             </Link>
+                            <Button
+                                variant="ghost"
+                                className="w-full text-red-500 hover:text-red-600 hover:bg-red-500/10 gap-2"
+                                onClick={handleVoid}
+                                disabled={voiding}
+                            >
+                                {voiding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                Void Receipt
+                            </Button>
                         </CardContent>
                     </Card>
                 </div>

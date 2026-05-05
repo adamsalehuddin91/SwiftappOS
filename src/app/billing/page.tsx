@@ -10,8 +10,20 @@ import { Pagination } from "@/components/Pagination";
 import { toast } from "sonner";
 import type { Invoice, Quotation, PaginatedResponse } from "@/types";
 
+interface ReceiptRow {
+  id: string;
+  receiptNumber: string;
+  amountPaid: number;
+  paymentMethod: string | null;
+  paymentDate: string;
+  clientName: string | null;
+  invoiceNumber: string;
+  invoiceId: string;
+  projectName: string | null;
+}
+
 export default function BillingPage() {
-  const [activeTab, setActiveTab] = useState<"invoices" | "quotations">("invoices");
+  const [activeTab, setActiveTab] = useState<"invoices" | "quotations" | "receipts">("invoices");
 
   // Invoice state
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -26,6 +38,12 @@ export default function BillingPage() {
   const [quotationTotalPages, setQuotationTotalPages] = useState(1);
   const [quotationSearch, setQuotationSearch] = useState("");
   const [quotationStatus, setQuotationStatus] = useState("");
+
+  // Receipt state
+  const [receipts, setReceipts] = useState<ReceiptRow[]>([]);
+  const [receiptPage, setReceiptPage] = useState(1);
+  const [receiptTotalPages, setReceiptTotalPages] = useState(1);
+  const [receiptLoading, setReceiptLoading] = useState(false);
 
   // Summary stats (fetched once from first page without filters)
   const [stats, setStats] = useState({ revenueYtd: 0, pendingCount: 0, pendingTotal: 0, paidCount: 0, draftQuotations: 0, totalQuotations: 0 });
@@ -106,6 +124,26 @@ export default function BillingPage() {
   useEffect(() => {
     fetchQuotations();
   }, [fetchQuotations]);
+
+  // Fetch receipts with pagination
+  const fetchReceipts = useCallback(async () => {
+    setReceiptLoading(true);
+    try {
+      const params = new URLSearchParams({ page: String(receiptPage), limit: "10" });
+      const res = await fetch(`/api/receipts?${params}`);
+      const data = await res.json();
+      setReceipts(data.data ?? []);
+      setReceiptTotalPages(data.totalPages ?? 1);
+    } catch {
+      toast.error("Failed to load receipts");
+    } finally {
+      setReceiptLoading(false);
+    }
+  }, [receiptPage]);
+
+  useEffect(() => {
+    if (activeTab === "receipts") fetchReceipts();
+  }, [fetchReceipts, activeTab]);
 
   // Reset page when search/status changes
   const handleInvoiceSearch = useCallback((s: string) => {
@@ -277,6 +315,12 @@ export default function BillingPage() {
           >
             Quotations
           </button>
+          <button
+            onClick={() => setActiveTab("receipts")}
+            className={`px-4 py-2 font-bold text-sm border-b-2 transition-colors ${activeTab === "receipts" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+          >
+            Receipts
+          </button>
         </div>
 
         {loading && (
@@ -427,6 +471,56 @@ export default function BillingPage() {
             </Card>
 
             <Pagination page={quotationPage} totalPages={quotationTotalPages} onPageChange={setQuotationPage} />
+          </div>
+        )}
+
+        {!loading && activeTab === "receipts" && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+            <Card className="border-primary/20 bg-card/50 backdrop-blur-md">
+              <CardHeader className="border-b border-border/50">
+                <CardTitle className="text-base">All Receipts</CardTitle>
+              </CardHeader>
+              {receiptLoading ? (
+                <CardContent className="p-8 flex justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </CardContent>
+              ) : receipts.length === 0 ? (
+                <CardContent className="p-8 text-center text-muted-foreground">
+                  <Receipt className="h-10 w-10 mx-auto mb-3 opacity-20" />
+                  <p>No receipts yet.</p>
+                </CardContent>
+              ) : (
+                <CardContent className="p-0">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border/50 bg-secondary/50 text-xs uppercase font-bold tracking-wider text-muted-foreground">
+                        <th className="px-6 py-3 text-left">Receipt #</th>
+                        <th className="px-6 py-3 text-left">Client</th>
+                        <th className="px-6 py-3 text-left">Invoice</th>
+                        <th className="px-6 py-3 text-left">Date</th>
+                        <th className="px-6 py-3 text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/50">
+                      {receipts.map((r) => (
+                        <tr
+                          key={r.id}
+                          onClick={() => window.location.href = `/billing/receipts/${r.id}`}
+                          className="hover:bg-secondary/30 transition-colors cursor-pointer"
+                        >
+                          <td className="px-6 py-3 font-mono font-bold text-primary">{r.receiptNumber}</td>
+                          <td className="px-6 py-3 text-muted-foreground">{r.clientName ?? "-"}</td>
+                          <td className="px-6 py-3 text-muted-foreground">{r.invoiceNumber}</td>
+                          <td className="px-6 py-3 text-muted-foreground">{new Date(r.paymentDate).toLocaleDateString("en-MY")}</td>
+                          <td className="px-6 py-3 text-right font-bold text-emerald-500">RM {r.amountPaid.toLocaleString("en-MY", { minimumFractionDigits: 2 })}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </CardContent>
+              )}
+            </Card>
+            <Pagination page={receiptPage} totalPages={receiptTotalPages} onPageChange={setReceiptPage} />
           </div>
         )}
       </div>

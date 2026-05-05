@@ -19,9 +19,9 @@ export async function POST(
       return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
     }
 
-    if (quotation.status !== "Accepted") {
+    if (quotation.status !== "Accepted" && quotation.status !== "Sent") {
       return NextResponse.json(
-        { error: "Only accepted quotations can be converted to invoices" },
+        { error: "Only sent or accepted quotations can be converted to invoices" },
         { status: 400 }
       );
     }
@@ -30,7 +30,7 @@ export async function POST(
     const autoAmounts: Record<string, number> = {
       Deposit:  Math.round(total * 0.5 * 100) / 100,
       Progress: Math.round(total * 0.25 * 100) / 100,
-      Final:    Math.round(total * 0.5 * 100) / 100,
+      Final:    Math.round(total * 0.25 * 100) / 100,
       Monthly:  0,
     };
     const invoiceAmount = customAmount ?? autoAmounts[billingType];

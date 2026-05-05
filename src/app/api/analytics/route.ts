@@ -55,6 +55,7 @@ export async function GET() {
       pendingMilestones: pendingMilestones.map((m) => ({
         id: m.id,
         name: m.name,
+        projectId: m.projectId,
         projectName: m.project.name,
         amount: Number(m.amount),
         status: m.status === "Completed" ? "Needs Invoice" : "Awaiting Payment",

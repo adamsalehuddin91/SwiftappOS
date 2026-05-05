@@ -32,6 +32,7 @@ function NewInvoicePageInner() {
   const [customAmount, setCustomAmount] = useState<number>(1000);
   const [selectedSystemId, setSelectedSystemId] = useState<string>("");
   const [companyDetails, setCompanyDetails] = useState<any>(null);
+  const [milestoneTotal, setMilestoneTotal] = useState<number>(0);
 
   useEffect(() => {
     const projectIdFromUrl = searchParams.get("projectId");
@@ -54,10 +55,24 @@ function NewInvoicePageInner() {
 
   const project = projects.find((p) => p.id === selectedProjectId);
 
+  // Fetch milestone total when project changes
+  useEffect(() => {
+    if (!selectedProjectId) { setMilestoneTotal(0); return; }
+    fetch(`/api/projects/${selectedProjectId}`)
+      .then((r) => r.json())
+      .then((d) => {
+        const total = (d.milestones ?? []).reduce((s: number, m: { amount: number }) => s + Number(m.amount), 0);
+        setMilestoneTotal(total);
+      })
+      .catch(() => setMilestoneTotal(0));
+  }, [selectedProjectId]);
+
+  const baseTotal = milestoneTotal > 0 ? milestoneTotal : 10000;
+
   const billingStages = [
-    { id: "Deposit", label: "Deposit (50%)", amount: 5000, type: "Deposit" as const },
-    { id: "Progress", label: "Progress (25%)", amount: 2500, type: "Progress" as const },
-    { id: "Final", label: "Handover (25%)", amount: 2500, type: "Final" as const },
+    { id: "Deposit", label: "Deposit (50%)", amount: Math.round(baseTotal * 0.5 * 100) / 100, type: "Deposit" as const },
+    { id: "Progress", label: "Progress (25%)", amount: Math.round(baseTotal * 0.25 * 100) / 100, type: "Progress" as const },
+    { id: "Final", label: "Handover (25%)", amount: Math.round(baseTotal * 0.25 * 100) / 100, type: "Final" as const },
     { id: "Monthly", label: "Monthly Retainer", amount: 0, type: "Monthly" as const },
   ];
 
@@ -226,7 +241,9 @@ function NewInvoicePageInner() {
                         <div>
                           <div className="font-medium text-foreground">{stage.label}</div>
                           <div className="text-sm text-muted-foreground">
-                            {stage.id === "Monthly" ? "Custom Amount" : `RM ${stage.amount.toLocaleString()}`}
+                            {stage.id === "Monthly"
+                              ? "Custom Amount"
+                              : `RM ${stage.amount.toLocaleString()}${milestoneTotal > 0 ? " (dari milestone)" : " (default)"}`}
                           </div>
                         </div>
                         <div className="text-sm font-bold uppercase tracking-wider text-amber-500">

@@ -3,6 +3,44 @@ import prisma from "@/lib/prisma";
 import { createReceiptSchema } from "@/lib/validations";
 import { getNextNumber } from "@/lib/sequences";
 
+export async function GET(request: NextRequest) {
+  try {
+    const url = new URL(request.url);
+    const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
+    const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") ?? 20)));
+    const skip = (page - 1) * limit;
+
+    const [receipts, total] = await Promise.all([
+      prisma.receipt.findMany({
+        orderBy: { paymentDate: "desc" },
+        include: { invoice: { include: { project: true } } },
+        skip,
+        take: limit,
+      }),
+      prisma.receipt.count(),
+    ]);
+
+    return NextResponse.json({
+      data: receipts.map((r) => ({
+        id: r.id,
+        receiptNumber: r.receiptNumber,
+        amountPaid: Number(r.amountPaid),
+        paymentMethod: r.paymentMethod,
+        paymentDate: r.paymentDate.toISOString().split("T")[0],
+        clientName: r.invoice.clientName ?? r.invoice.project?.clientName ?? null,
+        invoiceNumber: r.invoice.invoiceNumber,
+        invoiceId: r.invoiceId,
+        projectName: r.invoice.project?.name ?? null,
+      })),
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to fetch receipts" }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();

@@ -75,6 +75,14 @@ export async function POST(request: NextRequest) {
       include: { project: true },
     });
 
+    // Auto-sync: mark project's Completed milestones → Invoiced
+    if (data.projectId) {
+      await prisma.milestone.updateMany({
+        where: { projectId: data.projectId, status: "Completed" },
+        data: { status: "Invoiced" },
+      });
+    }
+
     return NextResponse.json(mapInvoice(invoice), { status: 201 });
   } catch (error) {
     return NextResponse.json(

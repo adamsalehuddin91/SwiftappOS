@@ -125,6 +125,7 @@ export interface AnalyticsData {
   pendingMilestones: {
     id: string;
     name: string;
+    projectId: string;
     projectName: string;
     amount: number;
     status: string;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ArrowDownRight, DollarSign, Bell, TrendingUp, Loader2 } from "lucide-react";
 import type { AnalyticsData } from "@/types";
@@ -49,7 +50,7 @@ export default function AnalyticsPage() {
         <Card className="border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5 relative overflow-hidden group">
           <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-emerald-500/10 blur-xl group-hover:bg-emerald-500/20 transition-all"></div>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
-            <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Net Profit (YTD)</CardTitle>
+            <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Cash Received (YTD)</CardTitle>
             <DollarSign className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent className="relative z-10">
@@ -130,24 +131,29 @@ export default function AnalyticsPage() {
             ) : (
               <div className="space-y-4">
                 {data.pendingMilestones.map((m) => (
-                  <div
+                  <Link
                     key={m.id}
-                    className={`flex items-center justify-between p-4 rounded-xl border hover:opacity-90 transition-colors ${
+                    href={m.status === "Needs Invoice"
+                      ? `/billing/invoices/new?projectId=${m.projectId}`
+                      : `/billing?status=Sent`}
+                    className={`flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all hover:scale-[1.01] ${
                       m.status === "Needs Invoice"
-                        ? "bg-amber-500/5 border-amber-500/20"
-                        : "bg-red-500/5 border-red-500/20"
+                        ? "bg-amber-500/5 border-amber-500/20 hover:bg-amber-500/10"
+                        : "bg-red-500/5 border-red-500/20 hover:bg-red-500/10"
                     }`}
                   >
                     <div>
                       <div className={`font-bold text-sm ${m.status === "Needs Invoice" ? "text-amber-500" : "text-red-500"}`}>
                         {m.projectName} - {m.name}
                       </div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{m.status}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {m.status === "Needs Invoice" ? "→ Click to create invoice" : "→ Click to view pending invoices"}
+                      </div>
                     </div>
                     <div className="text-right">
                       <div className="font-black text-foreground">RM {m.amount.toLocaleString()}</div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}

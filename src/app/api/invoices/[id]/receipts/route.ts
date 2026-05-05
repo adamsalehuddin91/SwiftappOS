@@ -80,10 +80,17 @@ export async function POST(
     // Auto-mark Paid if fully settled
     const totalPaid = totalAlreadyPaid + amount;
     if (totalPaid >= Number(invoice.amount) - 0.01) {
-      await prisma.invoice.update({
+      const paidInvoice = await prisma.invoice.update({
         where: { id: invoiceId },
         data: { status: "Paid" },
       });
+      // Auto-sync: mark project's Invoiced milestones → Paid
+      if (paidInvoice.projectId) {
+        await prisma.milestone.updateMany({
+          where: { projectId: paidInvoice.projectId, status: "Invoiced" },
+          data: { status: "Paid" },
+        });
+      }
     }
 
     return NextResponse.json(receipt, { status: 201 });

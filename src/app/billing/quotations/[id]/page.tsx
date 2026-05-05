@@ -83,7 +83,7 @@ export default function QuotationViewPage({ params }: { params: Promise<{ id: st
         const autoAmounts: Record<string, number> = {
             Deposit:  Math.round(total * 0.5 * 100) / 100,
             Progress: Math.round(total * 0.25 * 100) / 100,
-            Final:    Math.round(total * 0.5 * 100) / 100,
+            Final:    Math.round(total * 0.25 * 100) / 100,
             Monthly:  0,
         };
         const amount = convertStage === "Monthly"

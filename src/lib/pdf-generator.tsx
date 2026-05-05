@@ -21,8 +21,8 @@ const styles = StyleSheet.create({
         width: '60%',
     },
     logo: {
-        width: 160,
-        height: 70,
+        width: 220,
+        height: 100,
         objectFit: 'contain',
         marginBottom: 6,
     },
@@ -294,7 +294,7 @@ export const PdfDocument = ({ type, data, companyDetails }: PdfProps) => {
                 <Page size="A4" style={styles.page}>
                     <View style={{ textAlign: 'center', marginBottom: 20 }}>
                         {companyDetails?.logoUrl ? (
-                            <Image style={{ width: 160, height: 70, objectFit: 'contain', marginBottom: 6, alignSelf: 'center' }} src={companyDetails.logoUrl} />
+                            <Image style={{ width: 220, height: 100, objectFit: 'contain', marginBottom: 6, alignSelf: 'center' }} src={companyDetails.logoUrl} />
                         ) : (
                             <Text style={styles.companyName}>{companyDetails?.companyName || 'SwiftApp Ecosystem'}</Text>
                         )}

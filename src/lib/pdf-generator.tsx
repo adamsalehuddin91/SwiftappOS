@@ -21,8 +21,8 @@ const styles = StyleSheet.create({
         width: '60%',
     },
     logo: {
-        width: 80,
-        height: 40,
+        width: 160,
+        height: 70,
         objectFit: 'contain',
         marginBottom: 6,
     },
@@ -293,10 +293,11 @@ export const PdfDocument = ({ type, data, companyDetails }: PdfProps) => {
             <Document>
                 <Page size="A4" style={styles.page}>
                     <View style={{ textAlign: 'center', marginBottom: 20 }}>
-                        {companyDetails?.logoUrl && (
-                            <Image style={{ width: 80, height: 40, objectFit: 'contain', marginBottom: 6, alignSelf: 'center' }} src={companyDetails.logoUrl} />
+                        {companyDetails?.logoUrl ? (
+                            <Image style={{ width: 160, height: 70, objectFit: 'contain', marginBottom: 6, alignSelf: 'center' }} src={companyDetails.logoUrl} />
+                        ) : (
+                            <Text style={styles.companyName}>{companyDetails?.companyName || 'SwiftApp Ecosystem'}</Text>
                         )}
-                        <Text style={styles.companyName}>{companyDetails?.companyName || 'SwiftApp Ecosystem'}</Text>
                         <Text style={styles.companyDetailLine}>{companyDetails?.address || ''}</Text>
                         <Text style={styles.companyDetailLine}>Tel: {companyDetails?.contactNo || ''} | Email: {companyDetails?.email || ''}</Text>
                     </View>
@@ -358,10 +359,11 @@ export const PdfDocument = ({ type, data, companyDetails }: PdfProps) => {
             <Page size="A4" style={styles.page}>
                 <View style={styles.header}>
                     <View style={styles.companyLeft}>
-                        {companyDetails?.logoUrl && (
+                        {companyDetails?.logoUrl ? (
                             <Image style={styles.logo} src={companyDetails.logoUrl} />
+                        ) : (
+                            <Text style={styles.companyName}>{companyDetails?.companyName || 'SwiftApp Ecosystem'}</Text>
                         )}
-                        <Text style={styles.companyName}>{companyDetails?.companyName || 'SwiftApp Ecosystem'}</Text>
                         {companyDetails?.brn && (
                             <Text style={styles.companyDetailLine}>BRN: {companyDetails.brn}</Text>
                         )}

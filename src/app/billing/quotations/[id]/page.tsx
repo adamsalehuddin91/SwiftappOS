@@ -42,6 +42,7 @@ export default function QuotationViewPage({ params }: { params: Promise<{ id: st
                 setQuotation(quoteData);
             }
             if (settingsData && !settingsData.error) {
+                if (settingsData.logoUrl?.startsWith('/')) settingsData.logoUrl = window.location.origin + settingsData.logoUrl;
                 setCompanyDetails(settingsData);
             }
             setLoading(false);

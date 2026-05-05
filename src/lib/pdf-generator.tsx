@@ -1,4 +1,4 @@
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 
 const styles = StyleSheet.create({
     page: {
@@ -19,6 +19,12 @@ const styles = StyleSheet.create({
     },
     companyLeft: {
         width: '60%',
+    },
+    logo: {
+        width: 80,
+        height: 40,
+        objectFit: 'contain',
+        marginBottom: 6,
     },
     docInfoRight: {
         width: '35%',
@@ -287,6 +293,9 @@ export const PdfDocument = ({ type, data, companyDetails }: PdfProps) => {
             <Document>
                 <Page size="A4" style={styles.page}>
                     <View style={{ textAlign: 'center', marginBottom: 20 }}>
+                        {companyDetails?.logoUrl && (
+                            <Image style={{ width: 80, height: 40, objectFit: 'contain', marginBottom: 6, alignSelf: 'center' }} src={companyDetails.logoUrl} />
+                        )}
                         <Text style={styles.companyName}>{companyDetails?.companyName || 'SwiftApp Ecosystem'}</Text>
                         <Text style={styles.companyDetailLine}>{companyDetails?.address || ''}</Text>
                         <Text style={styles.companyDetailLine}>Tel: {companyDetails?.contactNo || ''} | Email: {companyDetails?.email || ''}</Text>
@@ -349,6 +358,9 @@ export const PdfDocument = ({ type, data, companyDetails }: PdfProps) => {
             <Page size="A4" style={styles.page}>
                 <View style={styles.header}>
                     <View style={styles.companyLeft}>
+                        {companyDetails?.logoUrl && (
+                            <Image style={styles.logo} src={companyDetails.logoUrl} />
+                        )}
                         <Text style={styles.companyName}>{companyDetails?.companyName || 'SwiftApp Ecosystem'}</Text>
                         {companyDetails?.brn && (
                             <Text style={styles.companyDetailLine}>BRN: {companyDetails.brn}</Text>

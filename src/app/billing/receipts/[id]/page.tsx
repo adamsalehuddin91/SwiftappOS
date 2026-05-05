@@ -55,6 +55,7 @@ export default function ReceiptViewPage({ params }: { params: Promise<{ id: stri
         ])
             .then(([data, settings]) => {
                 setReceipt(data);
+                if (settings?.logoUrl?.startsWith('/')) settings.logoUrl = window.location.origin + settings.logoUrl;
                 setCompanyDetails(settings);
                 setLoading(false);
             })

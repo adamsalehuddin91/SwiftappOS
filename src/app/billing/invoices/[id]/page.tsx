@@ -65,7 +65,10 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
         const receiptsTotal = (invData.receipts ?? []).reduce((s: number, r: Receipt) => s + r.amountPaid, 0);
         setPaymentAmount(invData.amount - receiptsTotal);
       }
-      if (settingsData && !settingsData.error) setCompanyDetails(settingsData);
+      if (settingsData && !settingsData.error) {
+        if (settingsData.logoUrl?.startsWith('/')) settingsData.logoUrl = window.location.origin + settingsData.logoUrl;
+        setCompanyDetails(settingsData);
+      }
     } catch {
       toast.error("Failed to load invoice details");
     } finally {

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Save, Loader2, Image as ImageIcon } from "lucide-react";
+import { Save, Loader2, Image as ImageIcon, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 
 export default function SettingsPage() {
@@ -22,6 +22,8 @@ export default function SettingsPage() {
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         async function fetchSettings() {
@@ -79,6 +81,26 @@ export default function SettingsPage() {
             toast.error("An error occurred while saving.");
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setUploading(true);
+        try {
+            const fd = new FormData();
+            fd.append("logo", file);
+            const res = await fetch("/api/settings/logo", { method: "POST", body: fd });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Upload failed");
+            setFormData((prev) => ({ ...prev, logoUrl: data.url }));
+            toast.success("Logo uploaded. Klik Save Settings untuk simpan.");
+        } catch (err: any) {
+            toast.error(err.message || "Failed to upload logo.");
+        } finally {
+            setUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = "";
         }
     };
 
@@ -264,45 +286,85 @@ export default function SettingsPage() {
                     <CardHeader className="border-b border-border/50 pb-4">
                         <CardTitle>Company Logo</CardTitle>
                         <CardDescription>
-                            Logo displayed on PDF quotations and invoices. Provide a publicly accessible URL.
+                            Logo akan muncul pada PDF invois, quotation dan resit. Upload terus atau guna URL.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="pt-6">
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <label className="text-sm font-semibold">Logo URL</label>
-                                <input
-                                    type="url"
-                                    name="logoUrl"
-                                    value={formData.logoUrl}
-                                    onChange={handleChange}
-                                    className={inputClass}
-                                    placeholder="e.g. https://yourdomain.com/logo.png"
-                                />
-                            </div>
-                            {formData.logoUrl && (
-                                <div className="p-4 border border-border/50 rounded-xl bg-secondary/10">
-                                    <label className="text-xs font-semibold uppercase text-muted-foreground mb-2 block">Preview</label>
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-24 h-24 rounded-lg border border-border/50 bg-white flex items-center justify-center overflow-hidden">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img
-                                                src={formData.logoUrl}
-                                                alt="Logo preview"
-                                                className="max-w-full max-h-full object-contain"
-                                                onError={(e) => {
-                                                    (e.target as HTMLImageElement).style.display = "none";
-                                                }}
-                                            />
-                                        </div>
-                                        <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-                                            <ImageIcon className="h-3.5 w-3.5" />
-                                            Logo will appear on generated PDFs
-                                        </div>
+                    <CardContent className="pt-6 space-y-4">
+
+                        {/* Upload zone */}
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                            className="hidden"
+                            onChange={handleLogoUpload}
+                        />
+                        <div
+                            onClick={() => !uploading && fileInputRef.current?.click()}
+                            className="flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed border-primary/30 rounded-xl bg-primary/5 hover:bg-primary/10 hover:border-primary/50 transition-all cursor-pointer"
+                        >
+                            {uploading ? (
+                                <>
+                                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                    <p className="text-sm font-medium text-muted-foreground">Uploading...</p>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                                        <Upload className="h-5 w-5 text-primary" />
                                     </div>
-                                </div>
+                                    <div className="text-center">
+                                        <p className="text-sm font-semibold text-foreground">Klik untuk upload logo</p>
+                                        <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WebP, SVG — max 2MB</p>
+                                    </div>
+                                </>
                             )}
                         </div>
+
+                        {/* Preview + clear */}
+                        {formData.logoUrl && (
+                            <div className="flex items-center gap-4 p-4 border border-border/50 rounded-xl bg-secondary/10">
+                                <div className="w-20 h-20 rounded-lg border border-border/50 bg-white flex items-center justify-center overflow-hidden shrink-0">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                        src={formData.logoUrl}
+                                        alt="Logo preview"
+                                        className="max-w-full max-h-full object-contain p-1"
+                                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                                    />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-bold uppercase text-muted-foreground mb-1">Logo semasa</p>
+                                    <p className="text-xs text-foreground truncate">{formData.logoUrl}</p>
+                                    <p className="text-xs text-emerald-500 mt-1 flex items-center gap-1">
+                                        <ImageIcon className="h-3 w-3" /> Akan muncul pada semua PDF
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData((p) => ({ ...p, logoUrl: "" }))}
+                                    className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                                    title="Remove logo"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Fallback — paste URL */}
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">
+                                Atau masukkan URL logo terus
+                            </label>
+                            <input
+                                name="logoUrl"
+                                value={formData.logoUrl}
+                                onChange={handleChange}
+                                className={inputClass}
+                                placeholder="https://yourdomain.com/logo.png"
+                            />
+                        </div>
+
                     </CardContent>
                 </Card>
 

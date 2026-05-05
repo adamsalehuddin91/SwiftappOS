@@ -177,7 +177,7 @@ export const updateSettingsSchema = z.object({
   bankName: z.string().max(200).optional().nullable().or(z.literal("")),
   bankAccount: z.string().max(100).optional().nullable().or(z.literal("")),
   bankSwift: z.string().max(20).optional().nullable().or(z.literal("")),
-  logoUrl: z.string().url().optional().nullable().or(z.literal("")),
+  logoUrl: z.string().optional().nullable().or(z.literal("")),
 });
 
 // ── Pagination ─────────────────────────────────────────

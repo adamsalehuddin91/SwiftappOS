@@ -49,6 +49,7 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
 
   // Void confirm
   const [voidConfirm, setVoidConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchInvoice = useCallback(async () => {
     try {
@@ -129,6 +130,26 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
       toast.error("Failed to record payment");
     } finally {
       setRecordingPayment(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!invoice) return;
+    if (!confirm(`Delete invoice ${invoice.invoice_number}? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/invoices/${invoice.id}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Invoice deleted.");
+        router.push("/billing");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Failed to delete invoice.");
+      }
+    } catch {
+      toast.error("Failed to delete invoice.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -517,6 +538,18 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
                   <FileText className="h-4 w-4" /> Back to Billing
                 </Button>
               </Link>
+
+              {invoice.status !== "Paid" && (
+                <Button
+                  variant="ghost"
+                  className="w-full text-red-500/70 hover:text-red-500 hover:bg-red-500/10 gap-2 text-xs mt-1"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                >
+                  {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Ban className="h-3.5 w-3.5" />}
+                  {deleting ? "Deleting..." : "Delete Invoice"}
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>

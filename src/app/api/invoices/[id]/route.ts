@@ -78,6 +78,32 @@ export async function PUT(
   }
 }
 
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const invoice = await prisma.invoice.findUnique({ where: { id } });
+    if (!invoice) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
+    if (invoice.status === "Paid") {
+      return NextResponse.json(
+        { error: "Cannot delete a paid invoice. Void it first if needed." },
+        { status: 400 }
+      );
+    }
+    await prisma.invoice.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to delete invoice" },
+      { status: 500 }
+    );
+  }
+}
+
 // Status update only (with workflow validation)
 export async function PATCH(
   request: NextRequest,

@@ -77,6 +77,26 @@ export async function PUT(
   }
 }
 
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const quotation = await prisma.quotation.findUnique({ where: { id } });
+    if (!quotation) {
+      return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
+    }
+    await prisma.quotation.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to delete quotation" },
+      { status: 500 }
+    );
+  }
+}
+
 // Status update only (with workflow validation)
 export async function PATCH(
   request: NextRequest,

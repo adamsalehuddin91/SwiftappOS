@@ -88,12 +88,6 @@ export async function DELETE(
     if (!invoice) {
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
-    if (invoice.status === "Paid") {
-      return NextResponse.json(
-        { error: "Cannot delete a paid invoice. Void it first if needed." },
-        { status: 400 }
-      );
-    }
     await prisma.invoice.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error) {

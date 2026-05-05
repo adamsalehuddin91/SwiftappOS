@@ -28,6 +28,7 @@ export default function QuotationViewPage({ params }: { params: Promise<{ id: st
     const [updating, setUpdating] = useState(false);
     const [converting, setConverting] = useState(false);
     const [duplicating, setDuplicating] = useState(false);
+    const [deleting, setDeleting] = useState(false);
     const [convertStage, setConvertStage] = useState<"Deposit" | "Progress" | "Final" | "Monthly">("Deposit");
     const [convertCustomAmount, setConvertCustomAmount] = useState("");
 
@@ -129,6 +130,26 @@ export default function QuotationViewPage({ params }: { params: Promise<{ id: st
             toast.error("Network error — could not duplicate quotation");
         } finally {
             setDuplicating(false);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!quotation) return;
+        if (!confirm(`Delete quotation ${quotation.quotation_number}? This cannot be undone.`)) return;
+        setDeleting(true);
+        try {
+            const res = await fetch(`/api/quotations/${quotation.id}`, { method: "DELETE" });
+            if (res.ok) {
+                toast.success("Quotation deleted.");
+                router.push("/billing");
+            } else {
+                const err = await res.json().catch(() => null);
+                toast.error(err?.error || "Failed to delete quotation.");
+            }
+        } catch {
+            toast.error("Failed to delete quotation.");
+        } finally {
+            setDeleting(false);
         }
     };
 
@@ -412,6 +433,17 @@ export default function QuotationViewPage({ params }: { params: Promise<{ id: st
                                         This quotation has been finalised.
                                     </p>
                                 )}
+                            </div>
+                            <div className="pt-2">
+                                <Button
+                                    variant="ghost"
+                                    className="w-full text-red-500/70 hover:text-red-500 hover:bg-red-500/10 gap-2 text-xs"
+                                    onClick={handleDelete}
+                                    disabled={deleting}
+                                >
+                                    {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
+                                    {deleting ? "Deleting..." : "Delete Quotation"}
+                                </Button>
                             </div>
                         </CardContent>
                     </Card>

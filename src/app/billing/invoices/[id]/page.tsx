@@ -135,7 +135,10 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
 
   const handleDelete = async () => {
     if (!invoice) return;
-    if (!confirm(`Delete invoice ${invoice.invoice_number}? This cannot be undone.`)) return;
+    const msg = invoice.status === "Paid"
+      ? `⚠️ Delete PAID invoice ${invoice.invoice_number}?\n\nIni akan delete invoice DAN semua receipts berkaitan. Tindakan ini tidak boleh dibatalkan.`
+      : `Delete invoice ${invoice.invoice_number}? This cannot be undone.`;
+    if (!confirm(msg)) return;
     setDeleting(true);
     try {
       const res = await fetch(`/api/invoices/${invoice.id}`, { method: "DELETE" });
@@ -539,17 +542,15 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
                 </Button>
               </Link>
 
-              {invoice.status !== "Paid" && (
-                <Button
-                  variant="ghost"
-                  className="w-full text-red-500/70 hover:text-red-500 hover:bg-red-500/10 gap-2 text-xs mt-1"
-                  onClick={handleDelete}
-                  disabled={deleting}
-                >
-                  {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Ban className="h-3.5 w-3.5" />}
-                  {deleting ? "Deleting..." : "Delete Invoice"}
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                className="w-full text-red-500/70 hover:text-red-500 hover:bg-red-500/10 gap-2 text-xs mt-1"
+                onClick={handleDelete}
+                disabled={deleting}
+              >
+                {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Ban className="h-3.5 w-3.5" />}
+                {deleting ? "Deleting..." : "Delete Invoice"}
+              </Button>
             </CardContent>
           </Card>
         </div>

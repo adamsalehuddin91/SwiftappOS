@@ -14,6 +14,14 @@ import { Loader2, Settings2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Milestone } from "@/types";
 
+const prismaToDisplay: Record<string, string> = {
+    InProgress: "In Progress",
+    Pending: "Pending",
+    Completed: "Completed",
+    Invoiced: "Invoiced",
+    Paid: "Paid",
+};
+
 export default function EditMilestoneDialog({ milestone }: { milestone: Milestone }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
@@ -21,7 +29,7 @@ export default function EditMilestoneDialog({ milestone }: { milestone: Mileston
     const [deleting, setDeleting] = useState(false);
     const [formData, setFormData] = useState({
         name: milestone.name,
-        status: milestone.status,
+        status: prismaToDisplay[milestone.status] ?? milestone.status,
         amount: milestone.amount,
     });
 
@@ -48,7 +56,8 @@ export default function EditMilestoneDialog({ milestone }: { milestone: Mileston
                 toast.success("Milestone updated successfully.");
                 router.refresh();
             } else {
-                toast.error("Failed to update milestone.");
+                const err = await res.json().catch(() => null);
+                toast.error(err?.error || "Failed to update milestone.");
             }
         } catch (error) {
             console.error("Failed to update milestone", error);
@@ -126,7 +135,7 @@ export default function EditMilestoneDialog({ milestone }: { milestone: Mileston
                             className="flex h-10 w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                         >
                             <option value="Pending">Pending</option>
-                            <option value="InProgress">In Progress</option>
+                            <option value="In Progress">In Progress</option>
                             <option value="Completed">Completed</option>
                             <option value="Invoiced">Invoiced</option>
                             <option value="Paid">Paid</option>

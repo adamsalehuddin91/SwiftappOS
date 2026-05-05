@@ -53,7 +53,7 @@ export const updateMilestoneSchema = z.object({
 // ── Invoices ───────────────────────────────────────────
 
 export const createInvoiceSchema = z.object({
-  projectId: z.string().uuid("Invalid project ID"),
+  projectId: z.string().uuid("Invalid project ID").optional().nullable(),
   milestoneId: z.string().uuid().optional().nullable(),
   type: InvoiceTypeEnum,
   amount: z.coerce.number().positive("Amount must be greater than 0"),

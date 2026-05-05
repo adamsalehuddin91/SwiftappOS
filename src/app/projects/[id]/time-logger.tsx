@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock, Plus, Loader2, Trash2 } from "lucide-react";
+import { Clock, Plus, Loader2, Trash2, Settings2, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import type { TimeLog } from "@/types";
 
@@ -12,6 +12,9 @@ export default function TimeLogger({ projectId, initialTimeLogs }: { projectId: 
     const [isAdding, setIsAdding] = useState(false);
     const [loading, setLoading] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [editId, setEditId] = useState<string | null>(null);
+    const [editLoading, setEditLoading] = useState(false);
+    const [editData, setEditData] = useState({ hours: "", description: "", date: "" });
 
     const [formData, setFormData] = useState({
         hours: "",
@@ -58,7 +61,7 @@ export default function TimeLogger({ projectId, initialTimeLogs }: { projectId: 
         setDeletingId(logId);
 
         try {
-            const res = await fetch(`/api/projects/${projectId}/time?id=${logId}`, {
+            const res = await fetch(`/api/time-logs/${logId}`, {
                 method: "DELETE",
             });
 
@@ -73,6 +76,46 @@ export default function TimeLogger({ projectId, initialTimeLogs }: { projectId: 
             toast.error("An error occurred while deleting.");
         } finally {
             setDeletingId(null);
+        }
+    };
+
+    const startEdit = (log: TimeLog) => {
+        setEditId(log.id);
+        setEditData({
+            hours: log.hours.toString(),
+            description: log.description || "",
+            date: new Date(log.date).toISOString().split("T")[0]
+        });
+    };
+
+    const handleEditSubmit = async (e: React.FormEvent, logId: string) => {
+        e.preventDefault();
+        setEditLoading(true);
+
+        try {
+            const res = await fetch(`/api/time-logs/${logId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    hours: Number(editData.hours),
+                    description: editData.description,
+                    date: editData.date
+                }),
+            });
+
+            if (res.ok) {
+                const updatedLog = await res.json();
+                setTimeLogs((prev) => prev.map((l) => (l.id === logId ? updatedLog : l)));
+                setEditId(null);
+                toast.success("Time log updated.");
+            } else {
+                toast.error("Failed to update time log.");
+            }
+        } catch (error) {
+            console.error("Failed to update time log", error);
+            toast.error("An error occurred while updating.");
+        } finally {
+            setEditLoading(false);
         }
     };
 
@@ -120,21 +163,49 @@ export default function TimeLogger({ projectId, initialTimeLogs }: { projectId: 
                 ) : (
                     <div className="space-y-2">
                         {timeLogs.map((log) => (
-                            <div key={log.id} className="group flex justify-between items-center p-3 text-sm border-b border-border/30 last:border-0 hover:bg-secondary/10 rounded-lg transition-colors">
-                                <div>
-                                    <span className="font-semibold text-foreground">{log.description}</span>
-                                    <div className="text-xs text-muted-foreground mt-0.5">{new Date(log.date).toLocaleDateString()}</div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="font-bold whitespace-nowrap bg-primary/10 text-primary px-2.5 py-1 rounded-md">{Number(log.hours)} hrs</div>
-                                    <button
-                                        onClick={() => handleDelete(log.id)}
-                                        disabled={deletingId === log.id}
-                                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500 transition-all"
-                                    >
-                                        {deletingId === log.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                                    </button>
-                                </div>
+                            <div key={log.id} className="group flex flex-col p-3 text-sm border-b border-border/30 last:border-0 hover:bg-secondary/10 rounded-lg transition-colors">
+                                {editId === log.id ? (
+                                    <form onSubmit={(e) => handleEditSubmit(e, log.id)} className="flex items-start gap-4">
+                                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 flex-1">
+                                            <input required type="date" value={editData.date} onChange={(e) => setEditData({ ...editData, date: e.target.value })} className="flex h-8 w-full rounded-md border border-input bg-background/50 text-xs px-2 shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                                            <input required type="number" step="0.5" min="0.5" value={editData.hours} onChange={(e) => setEditData({ ...editData, hours: e.target.value })} className="flex h-8 w-full rounded-md border border-input bg-background/50 text-xs px-2 shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                                            <input required type="text" value={editData.description} onChange={(e) => setEditData({ ...editData, description: e.target.value })} className="flex lg:col-span-2 h-8 w-full rounded-md border border-input bg-background/50 text-xs px-2 shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <Button type="submit" size="icon" variant="ghost" className="h-8 w-8 text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10" disabled={editLoading}>
+                                                {editLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                                            </Button>
+                                            <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-secondary" onClick={() => setEditId(null)}>
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </form>
+                                ) : (
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <span className="font-semibold text-foreground">{log.description}</span>
+                                            <div className="text-xs text-muted-foreground mt-0.5">{new Date(log.date).toLocaleDateString()}</div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="font-bold whitespace-nowrap bg-primary/10 text-primary px-2.5 py-1 rounded-md">{Number(log.hours)} hrs</div>
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={() => startEdit(log)}
+                                                    className="text-muted-foreground hover:text-primary p-1 rounded-md hover:bg-primary/10 transition-colors"
+                                                >
+                                                    <Settings2 className="h-3.5 w-3.5" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(log.id)}
+                                                    disabled={deletingId === log.id}
+                                                    className="text-muted-foreground hover:text-red-500 p-1 rounded-md hover:bg-red-500/10 transition-colors"
+                                                >
+                                                    {deletingId === log.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>

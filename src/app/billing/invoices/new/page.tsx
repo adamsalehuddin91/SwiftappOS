@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ArrowLeft, CheckCircle2, Loader2, Zap } from "lucide-react";
@@ -21,6 +21,7 @@ const PDFDownloadLink = dynamic(
 );
 
 function NewInvoicePageInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,22 +36,20 @@ function NewInvoicePageInner() {
   useEffect(() => {
     const projectIdFromUrl = searchParams.get("projectId");
 
-    fetch("/api/projects")
-      .then((r) => r.json())
-      .then((data) => {
-        const list = Array.isArray(data) ? data : [];
+    Promise.all([
+      fetch("/api/projects?limit=999").then((r) => r.json()),
+      fetch("/api/settings").then((r) => r.json()),
+    ])
+      .then(([projectsData, settingsData]) => {
+        const list: Project[] = projectsData.data ?? (Array.isArray(projectsData) ? projectsData : []);
         setProjects(list);
         if (projectIdFromUrl && list.some((p: Project) => p.id === projectIdFromUrl)) {
           setSelectedProjectId(projectIdFromUrl);
         }
+        if (settingsData && !settingsData.error) setCompanyDetails(settingsData);
       })
       .catch(() => toast.error("Failed to load projects"))
       .finally(() => setLoading(false));
-
-    fetch("/api/settings")
-      .then((r) => r.json())
-      .then((data) => setCompanyDetails(data))
-      .catch((err) => console.error("Error fetching settings:", err));
   }, [searchParams]);
 
   const project = projects.find((p) => p.id === selectedProjectId);
@@ -89,8 +88,10 @@ function NewInvoicePageInner() {
         }),
       });
       if (res.ok) {
+        const created = await res.json();
         setSaved(true);
         toast.success("Invoice created successfully");
+        router.push(`/billing/invoices/${created.id}`);
       } else {
         const err = await res.json().catch(() => ({}));
         toast.error(err.error || "Failed to create invoice");

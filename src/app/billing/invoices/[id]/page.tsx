@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -12,7 +12,11 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Download, Loader2, CheckCircle2, WalletCards, Send, Pencil, Ban, CreditCard, Clock, ExternalLink } from "lucide-react";
+import {
+  ArrowLeft, Download, Loader2, CheckCircle2, WalletCards, Send,
+  Pencil, Ban, CreditCard, Clock, ExternalLink, User, Mail, Hash,
+  FileText, Calendar, AlertTriangle, TrendingUp,
+} from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
@@ -33,70 +37,62 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
   const { id } = React.use(params);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [companyDetails, setCompanyDetails] = useState<any>(null);
-  const [projectDetails, setProjectDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
 
-  // Payment dialog state
+  // Payment dialog
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState("Bank Transfer");
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
   const [recordingPayment, setRecordingPayment] = useState(false);
 
-  useEffect(() => {
-    if (!id) return;
-    const fetchInvoice = fetch(`/api/invoices/${id}`).then((res) => res.json());
-    const fetchSettings = fetch(`/api/settings`).then((res) => res.json());
+  // Void confirm
+  const [voidConfirm, setVoidConfirm] = useState(false);
 
-    Promise.all([fetchInvoice, fetchSettings])
-      .then(async ([invoiceData, settingsData]) => {
-        if (invoiceData && !invoiceData.error) {
-          setInvoice(invoiceData);
-          // Set default payment amount to remaining balance
-          const receiptsTotal = (invoiceData.receipts ?? []).reduce((s: number, r: Receipt) => s + r.amountPaid, 0);
-          setPaymentAmount(invoiceData.amount - receiptsTotal);
-          // Fetch project details for client BRN
-          if (invoiceData.project_id) {
-            try {
-              const projRes = await fetch(`/api/projects/${invoiceData.project_id}`);
-              if (projRes.ok) {
-                const project = await projRes.json();
-                setProjectDetails(project);
-              }
-            } catch (e) {
-              console.error("Failed to load project", e);
-            }
-          }
-        }
-        if (settingsData && !settingsData.error) {
-          setCompanyDetails(settingsData);
-        }
-      })
-      .catch((err) => {
-        console.error("Error fetching data:", err);
-        toast.error("Failed to load invoice details");
-      })
-      .finally(() => setLoading(false));
+  const fetchInvoice = useCallback(async () => {
+    try {
+      const [invRes, settingsRes] = await Promise.all([
+        fetch(`/api/invoices/${id}`),
+        fetch("/api/settings"),
+      ]);
+      const invData = await invRes.json();
+      const settingsData = await settingsRes.json();
+
+      if (invData && !invData.error) {
+        setInvoice(invData);
+        const receiptsTotal = (invData.receipts ?? []).reduce((s: number, r: Receipt) => s + r.amountPaid, 0);
+        setPaymentAmount(invData.amount - receiptsTotal);
+      }
+      if (settingsData && !settingsData.error) setCompanyDetails(settingsData);
+    } catch {
+      toast.error("Failed to load invoice details");
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
-  const updateStatus = async (newStatus: "Sent" | "Paid" | "Void") => {
+  useEffect(() => {
+    fetchInvoice();
+  }, [fetchInvoice]);
+
+  const updateStatus = async (newStatus: "Sent" | "Void") => {
     if (!invoice) return;
     setUpdating(true);
+    setVoidConfirm(false);
     try {
       const res = await fetch(`/api/invoices/${invoice.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
-
       if (res.ok) {
         const updated = await res.json();
         setInvoice(updated);
         toast.success(`Invoice marked as ${newStatus}`);
       } else {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || `Failed to update status to ${newStatus}`);
+        toast.error(err.error || `Failed to update status`);
       }
     } catch {
       toast.error("Failed to update invoice status");
@@ -112,21 +108,16 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
       const res = await fetch(`/api/invoices/${invoice.id}/receipts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: paymentAmount,
-          paymentMethod,
-          paymentDate,
-        }),
+        body: JSON.stringify({ amount: paymentAmount, paymentMethod, paymentDate }),
+        // API at /api/invoices/[id]/receipts accepts { amount, paymentMethod, paymentDate }
       });
-
       if (res.ok) {
-        // Re-fetch invoice to get updated receipts and status
         const updatedRes = await fetch(`/api/invoices/${invoice.id}`);
         if (updatedRes.ok) {
-          const updatedInvoice = await updatedRes.json();
-          setInvoice(updatedInvoice);
-          const newReceiptsTotal = (updatedInvoice.receipts ?? []).reduce((s: number, r: Receipt) => s + r.amountPaid, 0);
-          setPaymentAmount(updatedInvoice.amount - newReceiptsTotal);
+          const updated = await updatedRes.json();
+          setInvoice(updated);
+          const newTotal = (updated.receipts ?? []).reduce((s: number, r: Receipt) => s + r.amountPaid, 0);
+          setPaymentAmount(updated.amount - newTotal);
         }
         setPaymentOpen(false);
         toast.success("Payment recorded successfully");
@@ -164,14 +155,12 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
 
   const pdfData = {
     number: invoice.invoice_number,
-    clientName: projectDetails?.client_name || invoice.project_name || "Valued Client",
-    clientEmail: projectDetails?.client_email || "billing@client.com",
-    clientBrn: projectDetails?.client_brn || "",
-    items: invoice.items && invoice.items.length > 0 ? invoice.items : [{
-      description: `${invoice.project_name} - ${invoice.type} Billing`,
-      quantity: 1,
-      unitPrice: invoice.amount
-    }],
+    clientName: invoice.client_name || "Valued Client",
+    clientEmail: invoice.client_email || "",
+    clientBrn: invoice.client_brn || "",
+    items: invoice.items && invoice.items.length > 0
+      ? invoice.items
+      : [{ description: `${invoice.project_name ?? ""} - ${invoice.type} Billing`, quantity: 1, unitPrice: invoice.amount }],
     total: invoice.amount,
     notes: INVOICE_TC,
   };
@@ -183,15 +172,15 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
     Void: "bg-red-500/10 text-red-500 border-red-500/20",
   };
 
-  // Status workflow: only allowed transitions
   const canMarkSent = invoice.status === "Draft";
-  const canMarkPaid = invoice.status === "Sent";
+  const canRecordPayment = invoice.status === "Draft" || invoice.status === "Sent";
   const canVoid = invoice.status === "Draft" || invoice.status === "Sent";
   const canEdit = invoice.status === "Draft";
-  const canRecordPayment = invoice.status === "Draft" || invoice.status === "Sent";
+  const isSettled = invoice.status === "Paid" || invoice.status === "Void";
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 max-w-5xl mx-auto pb-10">
+      {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/billing">
           <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-foreground">
@@ -211,34 +200,77 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
 
       <div className="grid gap-6 md:grid-cols-3">
         <div className="md:col-span-2 space-y-6">
+
+          {/* Invoice Details */}
           <Card className="border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5">
             <CardHeader className="border-b border-border/50 pb-4">
               <CardTitle className="text-base font-bold uppercase tracking-wider text-muted-foreground">Invoice Details</CardTitle>
             </CardHeader>
-            <CardContent className="pt-6 space-y-2">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Project:</span>
-                <span className="font-medium text-foreground">{invoice.project_name || "-"}</span>
+            <CardContent className="pt-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Billing Stage</p>
+                  <p className="font-semibold text-foreground">{invoice.type}</p>
+                </div>
+                {invoice.project_name && (
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Project</p>
+                    <p className="font-semibold text-foreground">{invoice.project_name}</p>
+                  </div>
+                )}
+                {invoice.due_date && (
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Due Date</p>
+                    <p className="font-semibold text-foreground flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                      {new Date(invoice.due_date).toLocaleDateString("en-MY", { year: "numeric", month: "long", day: "numeric" })}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Amount</p>
+                  <p className="text-xl font-black text-foreground">RM {invoice.amount.toLocaleString("en-MY", { minimumFractionDigits: 2 })}</p>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Billing Stage:</span>
-                <span className="font-medium text-foreground">{invoice.type}</span>
-              </div>
-              {projectDetails?.client_name && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Client:</span>
-                  <span className="font-medium text-foreground">{projectDetails.client_name}</span>
+
+              {/* Client info */}
+              {(invoice.client_name || invoice.client_email || invoice.client_brn) && (
+                <div className="pt-4 border-t border-border/30 space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Client</p>
+                  <div className="space-y-1.5">
+                    {invoice.client_name && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="font-semibold text-foreground">{invoice.client_name}</span>
+                      </div>
+                    )}
+                    {invoice.client_email && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Mail className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="text-muted-foreground">{invoice.client_email}</span>
+                      </div>
+                    )}
+                    {invoice.client_brn && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Hash className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="text-muted-foreground">BRN: {invoice.client_brn}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
-              {invoice.due_date && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Due Date:</span>
-                  <span className="font-medium text-foreground">{new Date(invoice.due_date).toLocaleDateString()}</span>
+
+              {/* Notes */}
+              {invoice.notes && (
+                <div className="pt-4 border-t border-border/30">
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Notes</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{invoice.notes}</p>
                 </div>
               )}
             </CardContent>
           </Card>
 
+          {/* Line Items */}
           <Card className="border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5">
             <CardHeader className="border-b border-border/50 pb-4">
               <CardTitle className="text-base font-bold uppercase tracking-wider text-muted-foreground">Line Items</CardTitle>
@@ -254,11 +286,10 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
-                  {(invoice.items && invoice.items.length > 0 ? invoice.items : [{
-                    description: `${invoice.type} Billing`,
-                    quantity: 1,
-                    unitPrice: invoice.amount
-                  }]).map((item, idx) => (
+                  {(invoice.items && invoice.items.length > 0
+                    ? invoice.items
+                    : [{ description: `${invoice.type} Billing`, quantity: 1, unitPrice: invoice.amount }]
+                  ).map((item, idx) => (
                     <tr key={idx} className="hover:bg-secondary/20 transition-colors">
                       <td className="py-3 font-medium">{item.description}</td>
                       <td className="py-3 text-center text-muted-foreground">{item.quantity}</td>
@@ -291,11 +322,37 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
             </CardContent>
           </Card>
 
-          {/* Receipts / Payment History */}
+          {/* Payment History */}
           <Card className="border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5">
             <CardHeader className="border-b border-border/50 pb-4">
-              <CardTitle className="text-base font-bold uppercase tracking-wider text-muted-foreground">Payment History</CardTitle>
-              <CardDescription>{receipts.length} payment(s) recorded</CardDescription>
+              <div className="flex items-start justify-between">
+                <div>
+                  <CardTitle className="text-base font-bold uppercase tracking-wider text-muted-foreground">Payment History</CardTitle>
+                  <CardDescription>{receipts.length} payment(s) recorded</CardDescription>
+                </div>
+                {receipts.length > 0 && invoice.status !== "Paid" && (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border bg-amber-500/10 text-amber-500 border-amber-500/20">
+                    Partial
+                  </span>
+                )}
+              </div>
+              {receipts.length > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1"><TrendingUp className="h-3 w-3" /> RM {receiptsTotal.toLocaleString("en-MY", { minimumFractionDigits: 2 })} paid</span>
+                    <span>RM {invoice.amount.toLocaleString("en-MY", { minimumFractionDigits: 2 })} total</span>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${receiptsTotal >= invoice.amount ? "bg-emerald-500" : "bg-amber-500"}`}
+                      style={{ width: `${Math.min((receiptsTotal / invoice.amount) * 100, 100)}%` }}
+                    />
+                  </div>
+                  {remainingBalance > 0 && (
+                    <p className="text-xs text-amber-500 font-semibold">RM {remainingBalance.toLocaleString("en-MY", { minimumFractionDigits: 2 })} remaining</p>
+                  )}
+                </div>
+              )}
             </CardHeader>
             <CardContent className="pt-0">
               {receipts.length === 0 ? (
@@ -338,7 +395,6 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
             </CardContent>
           </Card>
 
-          {/* Updated at */}
           {invoice.updated_at && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
               <Clock className="h-3 w-3" />
@@ -347,6 +403,7 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
           )}
         </div>
 
+        {/* Actions Sidebar */}
         <div className="space-y-6">
           <Card className="border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5 sticky top-6">
             <CardHeader className="border-b border-border/50 pb-4">
@@ -354,6 +411,7 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
               <CardDescription>Manage this invoice</CardDescription>
             </CardHeader>
             <CardContent className="pt-6 space-y-3">
+              {/* PDF Download */}
               <PDFDownloadLink
                 document={<PdfDocument type="Invoice" data={pdfData} companyDetails={companyDetails} />}
                 fileName={`${invoice.invoice_number}.pdf`}
@@ -366,6 +424,7 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
                 )}
               </PDFDownloadLink>
 
+              {/* Edit — Draft only */}
               {canEdit && (
                 <Link href={`/billing/invoices/${invoice.id}/edit`} className="block">
                   <Button variant="outline" className="w-full justify-start gap-2 border-primary/20 hover:bg-primary/5">
@@ -374,64 +433,90 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
                 </Link>
               )}
 
-              <div className="pt-4 border-t border-border/50 space-y-2">
-                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Update Status</p>
+              {/* Status actions */}
+              {!isSettled && (
+                <div className="pt-4 border-t border-border/50 space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Update Status</p>
 
-                {canMarkSent && (
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-amber-500 hover:text-amber-600 hover:bg-amber-50 border-amber-200"
-                    disabled={updating}
-                    onClick={() => updateStatus("Sent")}
-                  >
-                    <Send className="mr-2 h-4 w-4" /> Mark as Sent
-                  </Button>
-                )}
+                  {canMarkSent && (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start gap-2 text-amber-500 hover:text-amber-600 hover:bg-amber-50 border-amber-200"
+                      disabled={updating}
+                      onClick={() => updateStatus("Sent")}
+                    >
+                      <Send className="h-4 w-4" /> Mark as Sent
+                    </Button>
+                  )}
 
-                {canRecordPayment && (
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 border-emerald-200"
-                    disabled={updating}
-                    onClick={() => {
-                      setPaymentAmount(remainingBalance > 0 ? remainingBalance : invoice.amount);
-                      setPaymentDate(new Date().toISOString().slice(0, 10));
-                      setPaymentMethod("Bank Transfer");
-                      setPaymentOpen(true);
-                    }}
-                  >
-                    <WalletCards className="mr-2 h-4 w-4" /> Record Payment
-                  </Button>
-                )}
+                  {canRecordPayment && (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start gap-2 text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 border-emerald-200"
+                      disabled={updating}
+                      onClick={() => {
+                        setPaymentAmount(remainingBalance > 0 ? remainingBalance : invoice.amount);
+                        setPaymentDate(new Date().toISOString().slice(0, 10));
+                        setPaymentMethod("Bank Transfer");
+                        setPaymentOpen(true);
+                      }}
+                    >
+                      <WalletCards className="h-4 w-4" /> Record Payment
+                    </Button>
+                  )}
 
-                {canMarkPaid && (
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 border-emerald-200"
-                    disabled={updating}
-                    onClick={() => updateStatus("Paid")}
-                  >
-                    <CheckCircle2 className="mr-2 h-4 w-4" /> Mark as Paid
-                  </Button>
-                )}
+                  {canVoid && !voidConfirm && (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200"
+                      disabled={updating}
+                      onClick={() => setVoidConfirm(true)}
+                    >
+                      <Ban className="h-4 w-4" /> Void Invoice
+                    </Button>
+                  )}
 
-                {canVoid && (
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200"
-                    disabled={updating}
-                    onClick={() => updateStatus("Void")}
-                  >
-                    <Ban className="mr-2 h-4 w-4" /> Void Invoice
-                  </Button>
-                )}
+                  {/* Inline void confirm */}
+                  {voidConfirm && (
+                    <div className="rounded-lg border border-red-200 bg-red-50/50 p-3 space-y-2">
+                      <div className="flex items-center gap-2 text-red-600 text-xs font-bold">
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        Void invoice? This cannot be undone.
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 h-8 text-xs border-border/50"
+                          onClick={() => setVoidConfirm(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="flex-1 h-8 text-xs bg-red-500 hover:bg-red-600 text-white border-0"
+                          disabled={updating}
+                          onClick={() => updateStatus("Void")}
+                        >
+                          {updating ? <Loader2 className="h-3 w-3 animate-spin" /> : "Yes, Void"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
-                {(invoice.status === "Paid" || invoice.status === "Void") && (
-                  <p className="text-sm text-muted-foreground text-center italic py-2">
-                    This invoice has been {invoice.status.toLowerCase()}.
-                  </p>
-                )}
-              </div>
+              {isSettled && (
+                <p className="text-sm text-muted-foreground text-center italic py-2">
+                  This invoice has been {invoice.status.toLowerCase()}.
+                </p>
+              )}
+
+              <Link href="/billing" className="block pt-1">
+                <Button variant="ghost" className="w-full text-muted-foreground hover:text-foreground gap-2">
+                  <FileText className="h-4 w-4" /> Back to Billing
+                </Button>
+              </Link>
             </CardContent>
           </Card>
         </div>
@@ -443,7 +528,7 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
           <DialogHeader>
             <DialogTitle className="font-bold uppercase tracking-wider">Record Payment</DialogTitle>
             <DialogDescription>
-              Record a payment for {invoice.invoice_number}. Remaining balance: RM {remainingBalance.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
+              {invoice.invoice_number} — Remaining: RM {remainingBalance.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -456,8 +541,7 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
                 value={paymentAmount}
                 onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
                 step="0.01"
-                min="0"
-                max={remainingBalance > 0 ? remainingBalance : invoice.amount}
+                min="0.01"
                 className="flex h-10 w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 placeholder="Enter payment amount"
               />
@@ -475,6 +559,7 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
                 <option value="Cash">Cash</option>
                 <option value="Cheque">Cheque</option>
                 <option value="Online">Online</option>
+                <option value="DuitNow">DuitNow</option>
               </select>
             </div>
             <div>
@@ -499,13 +584,9 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
               className="gap-2 shadow-lg shadow-primary/25"
             >
               {recordingPayment ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Recording...
-                </>
+                <><Loader2 className="h-4 w-4 animate-spin" /> Recording...</>
               ) : (
-                <>
-                  <CreditCard className="h-4 w-4" /> Record Payment
-                </>
+                <><CheckCircle2 className="h-4 w-4" /> Record Payment</>
               )}
             </Button>
           </DialogFooter>

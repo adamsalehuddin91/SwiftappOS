@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Download, Loader2, Receipt as ReceiptIcon, FileText, Calendar, CreditCard, Hash } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Receipt as ReceiptIcon, FileText, Calendar, CreditCard, Hash, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
@@ -209,14 +209,14 @@ export default function ReceiptViewPage({ params }: { params: Promise<{ id: stri
                             </PDFDownloadLink>
                             {receipt.invoice && (
                                 <Link href={`/billing/invoices/${receipt.invoice.id}`} className="block">
-                                    <Button variant="outline" className="w-full border-primary/20 hover:bg-primary/5 gap-2">
-                                        <FileText className="h-4 w-4" /> View Invoice
+                                    <Button variant="outline" className="w-full gap-2 border-primary/20 hover:bg-primary/5">
+                                        <ExternalLink className="h-4 w-4" /> Back to Invoice
                                     </Button>
                                 </Link>
                             )}
                             <Link href="/billing" className="block">
-                                <Button variant="outline" className="w-full border-primary/20 hover:bg-primary/5">
-                                    Back to Billing
+                                <Button variant="ghost" className="w-full text-muted-foreground hover:text-foreground gap-2">
+                                    <FileText className="h-4 w-4" /> Back to Billing
                                 </Button>
                             </Link>
                         </CardContent>

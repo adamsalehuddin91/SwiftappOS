@@ -26,14 +26,94 @@ export default function NewMilestonePage({
         dueDate: "",
     });
 
+    // Full presets — klik untuk fill name + description + amount sekaligus
     const MILESTONE_PRESETS = [
-        { label: "Deposit 50%", name: "Bayaran Deposit — Mula Pembangunan", description: "50% deposit dibayar sebelum kerja pembangunan bermula.", amount: "" },
-        { label: "Go-Live 50%", name: "Bayaran Akhir — Sistem Go-Live", description: "Baki 50% dibayar selepas sistem siap, diuji dan diserahkan kepada klien.", amount: "" },
-        { label: "Progress 25%", name: "Bayaran Progres — Pertengahan Pembangunan", description: "25% mid-project payment selepas core features siap dan demo kepada klien.", amount: "" },
-        { label: "Monthly RM280", name: "Bayaran Bulanan — Hosting + Sokongan", description: "Bayaran bulanan merangkumi hosting, domain, sokongan teknikal dan kemaskini sistem.", amount: "280" },
-        { label: "Monthly RM200", name: "Bayaran Bulanan — Pakej Basic", description: "Bayaran bulanan pakej basic merangkumi hosting, domain dan sokongan teknikal.", amount: "200" },
-        { label: "Monthly RM350", name: "Bayaran Bulanan — Pakej Pro", description: "Bayaran bulanan pakej pro merangkumi hosting, domain, sokongan teknikal dan laporan tersuai.", amount: "350" },
+        // Billing stages
+        { group: "Billing", label: "Deposit 50%",    name: "Bayaran Deposit — Mula Pembangunan",         description: "50% deposit dibayar sebelum kerja pembangunan bermula.",                                               amount: "" },
+        { group: "Billing", label: "Progress 25%",   name: "Bayaran Progres — Pertengahan Pembangunan",  description: "25% mid-project payment selepas core features siap dan demo kepada klien.",                           amount: "" },
+        { group: "Billing", label: "Final 25%",      name: "Bayaran Akhir — Sistem Go-Live",             description: "Baki 25% dibayar selepas sistem siap, diuji dan diserahkan kepada klien.",                           amount: "" },
+        { group: "Billing", label: "Monthly RM200",  name: "Bayaran Bulanan — Pakej Basic",              description: "Bayaran bulanan merangkumi hosting, domain dan sokongan teknikal.",                                   amount: "200" },
+        { group: "Billing", label: "Monthly RM280",  name: "Bayaran Bulanan — Pakej Standard",           description: "Bayaran bulanan merangkumi hosting, domain, sokongan teknikal dan kemaskini sistem.",                 amount: "280" },
+        { group: "Billing", label: "Monthly RM350",  name: "Bayaran Bulanan — Pakej Pro",                description: "Bayaran bulanan merangkumi hosting, domain, sokongan teknikal, laporan dan feature tambahan.",        amount: "350" },
+        // Project phases
+        { group: "Fasa",    label: "Analisa",        name: "Analisa Keperluan & Skop Projek",            description: "Sesi requirement gathering, analisa keperluan klien dan pengesahan skop kerja.",                      amount: "" },
+        { group: "Fasa",    label: "Wireframe",      name: "Wireframe & Mockup UI",                      description: "Rekabentuk wireframe, flow pengguna dan mockup antara muka sistem.",                                  amount: "" },
+        { group: "Fasa",    label: "UI Design",      name: "Reka Bentuk UI/UX",                          description: "Design antara muka sistem menggunakan Figma atau tools design — untuk kelulusan klien.",              amount: "" },
+        { group: "Fasa",    label: "Setup",          name: "Setup Projek & Struktur Asas",               description: "Setup repository, database, environment, CI/CD dan struktur projek.",                                 amount: "" },
+        { group: "Fasa",    label: "Backend",        name: "Pembangunan Backend & API",                  description: "Pembangunan server-side logic, database schema, REST API dan business rules.",                        amount: "" },
+        { group: "Fasa",    label: "Frontend",       name: "Pembangunan Frontend & UI",                  description: "Pembangunan antara muka pengguna, integrasi API dan pengalaman pengguna (UX).",                       amount: "" },
+        { group: "Fasa",    label: "Integration",    name: "Integrasi & Testing",                        description: "Integrasi semua modul, unit testing, integration testing dan penyelesaian bugs.",                     amount: "" },
+        { group: "Fasa",    label: "UAT",            name: "User Acceptance Testing (UAT)",              description: "Sesi UAT bersama klien — klien menguji sistem dan memberikan maklum balas.",                          amount: "" },
+        { group: "Fasa",    label: "Deployment",     name: "Deployment & Go-Live",                       description: "Deploy sistem ke production server, setup domain, SSL dan konfigurasi production.",                   amount: "" },
+        { group: "Fasa",    label: "Training",       name: "Training & Handover",                        description: "Sesi latihan kepada pengguna, serahkan dokumentasi dan manual sistem kepada klien.",                  amount: "" },
+        // Modules
+        { group: "Modul",   label: "Auth",           name: "Modul Login & Pengurusan Pengguna",          description: "Sistem login, daftar, reset password, tahap akses dan pengurusan peranan pengguna.",                  amount: "" },
+        { group: "Modul",   label: "Dashboard",      name: "Modul Dashboard & Laporan",                  description: "Dashboard utama dengan statistik, carta dan laporan ringkasan prestasi sistem.",                     amount: "" },
+        { group: "Modul",   label: "POS",            name: "Modul Point of Sale (POS)",                  description: "Sistem jualan, pilih produk, proses pembayaran, cetak resit dan rekod transaksi.",                    amount: "" },
+        { group: "Modul",   label: "Inventori",      name: "Modul Inventori & Stok",                     description: "Pengurusan stok, masuk/keluar barang, alert stok rendah dan laporan inventori.",                     amount: "" },
+        { group: "Modul",   label: "Yuran",          name: "Modul Yuran & Bayaran",                      description: "Pengurusan yuran pelajar/ahli, rekod bayaran, jana resit dan laporan tunggakan.",                    amount: "" },
+        { group: "Modul",   label: "Pesakit",        name: "Modul Rekod Pesakit",                        description: "Pendaftaran pesakit, rekod perubatan, sejarah rawatan dan temujanji.",                               amount: "" },
+        { group: "Modul",   label: "Staff",          name: "Modul Pengurusan Staf & Kehadiran",          description: "Rekod staf, jadual kerja, pengurusan cuti dan laporan kehadiran.",                                    amount: "" },
+        { group: "Modul",   label: "Notifikasi",     name: "Modul Notifikasi WhatsApp",                  description: "Integrasi WhatsApp API untuk notifikasi automatik kepada pengguna atau klien.",                       amount: "" },
+        { group: "Modul",   label: "Invoice",        name: "Modul Invois & Pengebilan",                  description: "Jana invois, rekod pembayaran, jana resit dan laporan kewangan.",                                     amount: "" },
+        { group: "Modul",   label: "E-Commerce",     name: "Modul Katalog Produk & E-Commerce",          description: "Pengurusan produk, kategori, harga, cart dan proses checkout.",                                       amount: "" },
+        // Support
+        { group: "Support", label: "Bug Fix",        name: "Bug Fix & Pembaikan Pasca-Launch",           description: "Penyelesaian bugs yang dilaporkan selepas sistem go-live dalam tempoh waranti.",                      amount: "" },
+        { group: "Support", label: "Maintenance",    name: "Penyelenggaraan Bulanan",                    description: "Penyelenggaraan sistem, kemaskini keselamatan, backup dan sokongan teknikal bulanan.",                amount: "" },
+        { group: "Support", label: "Enhancement",    name: "Penambahbaikan & Feature Baru",              description: "Pembangunan feature tambahan atau penambahbaikan sistem berdasarkan permintaan klien.",               amount: "" },
     ];
+
+    // Name-only suggestions untuk datalist (typing autocomplete)
+    const MILESTONE_NAME_SUGGESTIONS = [
+        "Analisa Keperluan & Skop Projek",
+        "Wireframe & Mockup UI",
+        "Reka Bentuk UI/UX",
+        "Design Approval",
+        "Setup Projek & Struktur Asas",
+        "Pembangunan Backend & API",
+        "Pembangunan Frontend & UI",
+        "Integrasi & Testing",
+        "User Acceptance Testing (UAT)",
+        "Deployment & Go-Live",
+        "Training & Handover",
+        "Dokumentasi Sistem",
+        "Modul Login & Pengurusan Pengguna",
+        "Modul Dashboard & Laporan",
+        "Modul Point of Sale (POS)",
+        "Modul Inventori & Stok",
+        "Modul Yuran & Bayaran",
+        "Modul Rekod Pesakit",
+        "Modul Pengurusan Staf & Kehadiran",
+        "Modul Notifikasi WhatsApp",
+        "Modul Invois & Pengebilan",
+        "Modul Katalog Produk & E-Commerce",
+        "Modul Pengurusan Pelajar",
+        "Modul Pengurusan Guru",
+        "Modul Laporan & Eksport",
+        "Bayaran Deposit — Mula Pembangunan",
+        "Bayaran Progres — Pertengahan Pembangunan",
+        "Bayaran Akhir — Sistem Go-Live",
+        "Bayaran Bulanan — Pakej Basic",
+        "Bayaran Bulanan — Pakej Standard",
+        "Bayaran Bulanan — Pakej Pro",
+        "Bug Fix & Pembaikan Pasca-Launch",
+        "Penyelenggaraan Bulanan",
+        "Penambahbaikan & Feature Baru",
+        "Integrasi Third-Party API",
+        "Setup Server & Domain",
+        "Konfigurasi SSL & Keselamatan",
+        "Migrasi Data",
+        "Code Review & Audit",
+        "Performance Optimisation",
+    ];
+
+    const PRESET_GROUPS = ["Billing", "Fasa", "Modul", "Support"] as const;
+    const GROUP_LABELS: Record<string, string> = {
+        Billing: "💰 Billing",
+        Fasa: "🔧 Fasa Kerja",
+        Modul: "📦 Modul",
+        Support: "🛠 Support",
+    };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -97,39 +177,61 @@ export default function NewMilestonePage({
                 </CardHeader>
                 <CardContent className="pt-6">
                     <form onSubmit={handleSubmit} className="space-y-6">
+
+                        {/* Quick Fill — grouped presets */}
                         <div className="space-y-3">
                             <div className="flex items-center gap-2">
                                 <Zap className="h-4 w-4 text-primary" />
-                                <span className="text-sm font-medium text-muted-foreground">Quick Fill</span>
+                                <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Quick Fill</span>
+                                <span className="text-xs text-muted-foreground">(auto-fill nama + deskripsi + amaun)</span>
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                                {MILESTONE_PRESETS.map((preset) => (
-                                    <button
-                                        key={preset.label}
-                                        type="button"
-                                        onClick={() =>
-                                            setFormData((prev) => ({
-                                                ...prev,
-                                                name: preset.name,
-                                                description: preset.description,
-                                                amount: preset.amount,
-                                            }))
-                                        }
-                                        className="px-3 py-1.5 text-xs font-medium rounded-full border border-primary/30 bg-primary/5 text-primary hover:bg-primary/15 hover:border-primary/50 transition-colors"
-                                    >
-                                        {preset.label}
-                                    </button>
+                            <div className="space-y-2">
+                                {PRESET_GROUPS.map((group) => (
+                                    <div key={group} className="flex flex-wrap items-center gap-2">
+                                        <span className="text-xs font-bold text-muted-foreground w-20 shrink-0">{GROUP_LABELS[group]}</span>
+                                        {MILESTONE_PRESETS.filter((p) => p.group === group).map((preset) => (
+                                            <button
+                                                key={preset.label}
+                                                type="button"
+                                                onClick={() =>
+                                                    setFormData((prev) => ({
+                                                        ...prev,
+                                                        name: preset.name,
+                                                        description: preset.description,
+                                                        amount: preset.amount,
+                                                    }))
+                                                }
+                                                className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                                                    formData.name === preset.name
+                                                        ? "bg-primary text-primary-foreground border-primary"
+                                                        : "border-primary/30 bg-primary/5 text-primary hover:bg-primary/15 hover:border-primary/50"
+                                                }`}
+                                            >
+                                                {preset.label}
+                                            </button>
+                                        ))}
+                                    </div>
                                 ))}
                             </div>
                         </div>
 
                         <div className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="name">Milestone Name <span className="text-red-500">*</span></Label>
+                                <Label htmlFor="name">
+                                    Milestone Name <span className="text-red-500">*</span>
+                                    <span className="text-xs font-normal text-muted-foreground ml-2">— taip atau pilih dari senarai</span>
+                                </Label>
+                                {/* datalist provides dropdown suggestions while still allowing free-type */}
+                                <datalist id="milestone-name-list">
+                                    {MILESTONE_NAME_SUGGESTIONS.map((s) => (
+                                        <option key={s} value={s} />
+                                    ))}
+                                </datalist>
                                 <Input
                                     id="name"
                                     name="name"
-                                    placeholder="e.g. Phase 1: Authentication API"
+                                    list="milestone-name-list"
+                                    placeholder="Taip nama milestone atau pilih dari senarai..."
                                     value={formData.name}
                                     onChange={handleChange}
                                     required

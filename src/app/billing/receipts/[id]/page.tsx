@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Download, Loader2, Receipt as ReceiptIcon, FileText, Calendar, CreditCard, Hash, ExternalLink } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Receipt as ReceiptIcon, FileText, Calendar, CreditCard, Hash, ExternalLink, User } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
@@ -30,7 +30,9 @@ interface ReceiptData {
         id: string;
         invoiceNumber: string;
         amount: number;
-        projectName: string;
+        projectName: string | null;
+        clientName: string | null;
+        clientBrn: string | null;
     };
 }
 
@@ -83,7 +85,7 @@ export default function ReceiptViewPage({ params }: { params: Promise<{ id: stri
         invoiceNumber: receipt.invoice?.invoiceNumber ?? "-",
         paymentMethod: receipt.paymentMethod ?? "Bank Transfer",
         paymentDate: new Date(receipt.paymentDate).toLocaleDateString("en-MY", { year: "numeric", month: "long", day: "numeric" }),
-        projectName: receipt.invoice?.projectName ?? "-",
+        projectName: receipt.invoice?.clientName ?? receipt.invoice?.projectName ?? "-",
         amountPaid: receipt.amountPaid,
     };
 
@@ -168,6 +170,23 @@ export default function ReceiptViewPage({ params }: { params: Promise<{ id: stri
                                 </div>
                             </div>
 
+                            {receipt.invoice?.clientName && (
+                                <div className="flex items-center justify-between py-3 border-b border-border/30">
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-9 w-9 rounded-lg bg-sky-500/10 flex items-center justify-center">
+                                            <User className="h-4 w-4 text-sky-500" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-bold uppercase text-muted-foreground">Client</p>
+                                            <p className="font-medium text-foreground">{receipt.invoice.clientName}</p>
+                                            {receipt.invoice.clientBrn && (
+                                                <p className="text-xs text-muted-foreground">BRN: {receipt.invoice.clientBrn}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {receipt.invoice && (
                                 <div className="flex items-center justify-between py-3">
                                     <div className="flex items-center gap-3">
@@ -180,7 +199,7 @@ export default function ReceiptViewPage({ params }: { params: Promise<{ id: stri
                                                 href={`/billing/invoices/${receipt.invoice.id}`}
                                                 className="font-medium text-primary hover:underline"
                                             >
-                                                {receipt.invoice.invoiceNumber} — {receipt.invoice.projectName}
+                                                {receipt.invoice.invoiceNumber}{receipt.invoice.projectName ? ` — ${receipt.invoice.projectName}` : ""}
                                             </Link>
                                         </div>
                                     </div>

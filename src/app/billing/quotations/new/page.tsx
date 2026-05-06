@@ -34,6 +34,7 @@ function NewQuotationPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activePreset, setActivePreset] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
   const [items, setItems] = useState<QuotationItem[]>([
     { id: 1, description: "", quantity: 1, unitPrice: 0 },
   ]);
@@ -55,9 +56,10 @@ function NewQuotationPageInner() {
       .then(data => setCompanyDetails(data))
       .catch(() => toast.error("Failed to load company settings"));
 
-    const projectId = searchParams.get("projectId");
-    if (projectId) {
-      fetch(`/api/projects/${projectId}`)
+    const pid = searchParams.get("projectId");
+    if (pid) {
+      setProjectId(pid);
+      fetch(`/api/projects/${pid}`)
         .then(r => r.json())
         .then(data => {
           if (data?.client_name) setClientName(data.client_name);
@@ -115,6 +117,7 @@ function NewQuotationPageInner() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          projectId: projectId || undefined,
           clientName,
           clientEmail: clientEmail || undefined,
           clientPhone: clientPhone || undefined,

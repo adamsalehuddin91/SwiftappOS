@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Trash2, Plus, FileText, User, Loader2, Save, Receipt } from "lucide-react";
+import { ArrowLeft, Trash2, Plus, FileText, User, Loader2, Save, Receipt, FolderOpen } from "lucide-react";
 import Link from "next/link";
 import { Invoice, InvoiceType } from "@/types";
 import { toast } from "sonner";
@@ -27,6 +27,8 @@ export default function EditInvoicePage({ params }: { params: Promise<{ id: stri
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [invoiceStatus, setInvoiceStatus] = useState<string>("Draft");
+    const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+    const [selectedProjectId, setSelectedProjectId] = useState<string>("");
     const [type, setType] = useState<InvoiceType>("Deposit");
     const [amount, setAmount] = useState(0);
     const [dueDate, setDueDate] = useState("");
@@ -35,6 +37,13 @@ export default function EditInvoicePage({ params }: { params: Promise<{ id: stri
     const [clientEmail, setClientEmail] = useState("");
     const [clientBrn, setClientBrn] = useState("");
     const [items, setItems] = useState<EditableItem[]>([]);
+
+    useEffect(() => {
+        fetch("/api/projects?limit=100")
+            .then(r => r.json())
+            .then(d => setProjects((d.data ?? []).map((p: { id: string; name: string }) => ({ id: p.id, name: p.name }))))
+            .catch(() => {});
+    }, []);
 
     useEffect(() => {
         if (!id) return;
@@ -47,6 +56,7 @@ export default function EditInvoicePage({ params }: { params: Promise<{ id: stri
                     return;
                 }
                 setInvoiceStatus(data.status);
+                setSelectedProjectId(data.project_id ?? "");
                 setType(data.type);
                 setAmount(data.amount);
                 setDueDate(data.due_date ? data.due_date.slice(0, 10) : "");
@@ -105,6 +115,7 @@ export default function EditInvoicePage({ params }: { params: Promise<{ id: stri
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                    projectId: selectedProjectId || null,
                     type,
                     amount: items.length > 0 ? calculateTotal() : amount,
                     dueDate: dueDate || undefined,
@@ -198,6 +209,31 @@ export default function EditInvoicePage({ params }: { params: Promise<{ id: stri
                                     onChange={(e) => setClientEmail(e.target.value)}
                                     className="bg-secondary/20 border-border/50 focus:border-primary/50"
                                 />
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5">
+                        <CardHeader className="border-b border-border/50 pb-4">
+                            <CardTitle className="text-base font-bold flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
+                                <FolderOpen className="h-4 w-4 text-primary" />
+                                Project Link
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-6">
+                            <div className="grid gap-2">
+                                <Label htmlFor="project">Link to Project</Label>
+                                <select
+                                    id="project"
+                                    value={selectedProjectId}
+                                    onChange={(e) => setSelectedProjectId(e.target.value)}
+                                    className="flex h-10 w-full rounded-md border bg-secondary/20 border-border/50 focus:border-primary/50 px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                >
+                                    <option value="">— No Project —</option>
+                                    {projects.map(p => (
+                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                    ))}
+                                </select>
                             </div>
                         </CardContent>
                     </Card>

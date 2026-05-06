@@ -63,6 +63,7 @@ export async function PUT(
         ...(!isSent && data.amount !== undefined && { amount: data.amount }),
         ...(!isSent && data.items !== undefined && { items: data.items }),
         // Always editable
+        ...(data.projectId !== undefined && { projectId: data.projectId || null }),
         ...(data.dueDate !== undefined && { dueDate: data.dueDate ? new Date(data.dueDate) : null }),
         ...(data.clientName !== undefined && { clientName: data.clientName }),
         ...(data.clientEmail !== undefined && { clientEmail: data.clientEmail || null }),

@@ -70,6 +70,7 @@ export const createInvoiceSchema = z.object({
 });
 
 export const updateInvoiceSchema = z.object({
+  projectId: z.string().uuid().optional().nullable(),
   type: InvoiceTypeEnum.optional(),
   amount: z.coerce.number().positive().optional(),
   dueDate: z.string().optional().nullable(),

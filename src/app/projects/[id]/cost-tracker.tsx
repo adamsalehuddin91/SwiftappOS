@@ -15,6 +15,11 @@ const EXPENSE_PRESETS = [
     { label: "Domain .com", category: "Domain" as const, amount: "50", description: "Domain .com — Pendaftaran Tahunan" },
     { label: "Cloudflare", category: "Server" as const, amount: "0", description: "Cloudflare DNS + CDN + SSL" },
     { label: "WhatsApp API", category: "Software" as const, amount: "99", description: "WhatsApp Business API — Notifikasi" },
+    { label: "Resend Email", category: "Software" as const, amount: "20", description: "Resend — Email API (Pro Plan)" },
+    { label: "Coolify", category: "Server" as const, amount: "0", description: "Coolify Self-hosted — Deploy Platform" },
+    { label: "Supabase Free", category: "Server" as const, amount: "0", description: "Supabase Free Tier — Database + Auth" },
+    { label: "Nama.my Domain", category: "Domain" as const, amount: "80", description: "Domain nama.my — Pendaftaran Tahunan" },
+    { label: "SSL Cert", category: "Server" as const, amount: "0", description: "SSL Certificate — Let's Encrypt / Cloudflare" },
 ];
 
 export default function CostTracker({ projectId, initialCosts }: { projectId: string; initialCosts: ProjectCost[] }) {

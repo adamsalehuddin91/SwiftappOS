@@ -52,29 +52,18 @@ export default function BillingPage() {
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [quotationLoading, setQuotationLoading] = useState(false);
 
-  // Fetch summary stats once
+  // Fetch summary stats once from dedicated endpoint
   useEffect(() => {
-    Promise.all([
-      fetch("/api/invoices?page=1&limit=999").then((r) => r.json()),
-      fetch("/api/quotations?page=1&limit=999").then((r) => r.json()),
-    ])
-      .then(([invRes, quotRes]) => {
-        const allInv: Invoice[] = invRes.data ?? (Array.isArray(invRes) ? invRes : []);
-        const allQuot: Quotation[] = quotRes.data ?? (Array.isArray(quotRes) ? quotRes : []);
-
-        const revenueYtd = allInv.filter((i) => i.status === "Paid").reduce((s, i) => s + i.amount, 0);
-        const pending = allInv.filter((i) => i.status === "Draft" || i.status === "Sent");
-        const pendingTotal = pending.reduce((s, i) => s + i.amount, 0);
-        const paidCount = allInv.filter((i) => i.status === "Paid").length;
-        const draftQuotations = allQuot.filter((q) => q.status === "Draft").length;
-
+    fetch("/api/billing/stats")
+      .then((r) => r.json())
+      .then((data) => {
         setStats({
-          revenueYtd,
-          pendingCount: pending.length,
-          pendingTotal,
-          paidCount,
-          draftQuotations,
-          totalQuotations: allQuot.length,
+          revenueYtd: data.revenueYtd ?? 0,
+          pendingCount: data.pendingCount ?? 0,
+          pendingTotal: data.pendingTotal ?? 0,
+          paidCount: data.paidCount ?? 0,
+          draftQuotations: data.draftQuotations ?? 0,
+          totalQuotations: data.totalQuotations ?? 0,
         });
       })
       .catch(() => toast.error("Failed to load summary stats"))

@@ -42,8 +42,8 @@ export async function PUT(
     if (!existing) {
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
-    if (existing.status !== "Draft") {
-      return NextResponse.json({ error: "Only draft invoices can be edited" }, { status: 400 });
+    if (existing.status !== "Draft" && existing.status !== "Sent") {
+      return NextResponse.json({ error: "Only Draft or Sent invoices can be edited" }, { status: 400 });
     }
 
     const body = await request.json();
@@ -53,14 +53,17 @@ export async function PUT(
     }
 
     const data = parsed.data;
+    const isSent = existing.status === "Sent";
 
     const invoice = await prisma.invoice.update({
       where: { id },
       data: {
-        ...(data.type !== undefined && { type: data.type }),
-        ...(data.amount !== undefined && { amount: data.amount }),
+        // Lock amount, type, items for Sent invoices
+        ...(!isSent && data.type !== undefined && { type: data.type }),
+        ...(!isSent && data.amount !== undefined && { amount: data.amount }),
+        ...(!isSent && data.items !== undefined && { items: data.items }),
+        // Always editable
         ...(data.dueDate !== undefined && { dueDate: data.dueDate ? new Date(data.dueDate) : null }),
-        ...(data.items !== undefined && { items: data.items }),
         ...(data.clientName !== undefined && { clientName: data.clientName }),
         ...(data.clientEmail !== undefined && { clientEmail: data.clientEmail || null }),
         ...(data.clientBrn !== undefined && { clientBrn: data.clientBrn }),

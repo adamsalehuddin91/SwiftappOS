@@ -26,6 +26,7 @@ export default function EditInvoicePage({ params }: { params: Promise<{ id: stri
     const { id } = React.use(params);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [invoiceStatus, setInvoiceStatus] = useState<string>("Draft");
     const [type, setType] = useState<InvoiceType>("Deposit");
     const [amount, setAmount] = useState(0);
     const [dueDate, setDueDate] = useState("");
@@ -40,11 +41,12 @@ export default function EditInvoicePage({ params }: { params: Promise<{ id: stri
         fetch(`/api/invoices/${id}`)
             .then((res) => res.json())
             .then((data: Invoice) => {
-                if (data.status !== "Draft") {
-                    toast.error("Only draft invoices can be edited");
+                if (data.status !== "Draft" && data.status !== "Sent") {
+                    toast.error("Only Draft or Sent invoices can be edited");
                     router.push(`/billing/invoices/${id}`);
                     return;
                 }
+                setInvoiceStatus(data.status);
                 setType(data.type);
                 setAmount(data.amount);
                 setDueDate(data.due_date ? data.due_date.slice(0, 10) : "");
@@ -151,7 +153,9 @@ export default function EditInvoicePage({ params }: { params: Promise<{ id: stri
                 </Link>
                 <div>
                     <h1 className="text-3xl font-black tracking-tight text-foreground">Edit Invoice</h1>
-                    <p className="text-sm text-muted-foreground mt-1">Modify this draft invoice.</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                        {invoiceStatus === "Sent" ? "Sent invoice — notes, due date & client details only." : "Modify this draft invoice."}
+                    </p>
                 </div>
             </div>
 
@@ -206,13 +210,19 @@ export default function EditInvoicePage({ params }: { params: Promise<{ id: stri
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="pt-6 space-y-5">
+                            {invoiceStatus === "Sent" && (
+                                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-amber-600 font-medium">
+                                    Invoice already sent — amount and line items are locked.
+                                </div>
+                            )}
                             <div className="grid gap-2">
                                 <Label htmlFor="type">Invoice Type</Label>
                                 <select
                                     id="type"
                                     value={type}
+                                    disabled={invoiceStatus === "Sent"}
                                     onChange={(e) => setType(e.target.value as InvoiceType)}
-                                    className="flex h-10 w-full rounded-md border bg-secondary/20 border-border/50 focus:border-primary/50 px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                    className="flex h-10 w-full rounded-md border bg-secondary/20 border-border/50 focus:border-primary/50 px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {INVOICE_TYPES.map((t) => (
                                         <option key={t} value={t}>{t}</option>
@@ -227,10 +237,10 @@ export default function EditInvoicePage({ params }: { params: Promise<{ id: stri
                                     value={amount}
                                     onChange={(e) => setAmount(Number(e.target.value))}
                                     min={0}
-                                    disabled={items.length > 0}
+                                    disabled={items.length > 0 || invoiceStatus === "Sent"}
                                     className="bg-secondary/20 border-border/50 focus:border-primary/50"
                                 />
-                                {items.length > 0 && (
+                                {items.length > 0 && invoiceStatus !== "Sent" && (
                                     <p className="text-xs text-muted-foreground">Amount is calculated from line items.</p>
                                 )}
                             </div>
@@ -247,15 +257,17 @@ export default function EditInvoicePage({ params }: { params: Promise<{ id: stri
                         </CardContent>
                     </Card>
 
-                    <Card className="border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5">
+                    <Card className={`border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5 ${invoiceStatus === "Sent" ? "opacity-50 pointer-events-none" : ""}`}>
                         <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 pb-4">
                             <CardTitle className="text-base font-bold flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
                                 <FileText className="h-4 w-4 text-primary" />
                                 Line Items
                             </CardTitle>
-                            <Button size="sm" onClick={addItem} type="button" className="gap-2 shadow-md shadow-primary/20">
-                                <Plus className="h-3 w-3" /> Add Item
-                            </Button>
+                            {invoiceStatus !== "Sent" && (
+                                <Button size="sm" onClick={addItem} type="button" className="gap-2 shadow-md shadow-primary/20">
+                                    <Plus className="h-3 w-3" /> Add Item
+                                </Button>
+                            )}
                         </CardHeader>
                         <CardContent className="pt-6 space-y-4">
                             {items.length === 0 && (

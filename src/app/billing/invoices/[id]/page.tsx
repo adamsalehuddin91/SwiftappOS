@@ -202,7 +202,7 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
   const canMarkSent = invoice.status === "Draft";
   const canRecordPayment = invoice.status === "Draft" || invoice.status === "Sent";
   const canVoid = invoice.status === "Draft" || invoice.status === "Sent";
-  const canEdit = invoice.status === "Draft";
+  const canEdit = invoice.status === "Draft" || invoice.status === "Sent";
   const isSettled = invoice.status === "Paid" || invoice.status === "Void";
 
   return (

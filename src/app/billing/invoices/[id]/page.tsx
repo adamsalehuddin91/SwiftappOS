@@ -189,7 +189,7 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
       ? invoice.items
       : [{ description: `${invoice.project_name ?? ""} - ${invoice.type} Billing`, quantity: 1, unitPrice: invoice.amount }],
     total: invoice.amount,
-    notes: invoice.notes || INVOICE_TC,
+    notes: INVOICE_TC,
   };
 
   const statusColors: Record<string, string> = {

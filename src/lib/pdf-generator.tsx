@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
         color: '#112233',
     },
     footerContainer: {
-        marginTop: 'auto',
+        marginTop: 16,
     },
     notesBox: {
         marginBottom: 20,
@@ -485,7 +485,7 @@ export const PdfDocument = ({ type, data, companyDetails }: PdfProps) => {
                             ))}
                     </View>
 
-                    <View style={styles.signaturesRow}>
+                    <View style={styles.signaturesRow} wrap={false}>
                         <View style={styles.signatureBlock}>
                             <View style={styles.signatureLine}></View>
                             <Text style={styles.signatureLabel}>Client Acceptance & Stamp</Text>

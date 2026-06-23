@@ -37,9 +37,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-full max-w-sm">
-        <div className="bg-white rounded-2xl border border-border/50 shadow-2xl shadow-primary/5 p-8">
+        <div className="luxe-card rounded-2xl shadow-2xl shadow-primary/10 p-8">
           <div className="flex flex-col items-center mb-8">
             <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mb-4">
               <Zap className="h-7 w-7 text-primary" />

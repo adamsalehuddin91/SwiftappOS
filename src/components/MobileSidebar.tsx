@@ -14,7 +14,7 @@ export function MobileSidebar() {
             <Button
                 variant="ghost"
                 size="icon"
-                className="md:hidden fixed top-4 left-4 z-50 bg-white/80 backdrop-blur-sm border shadow-sm"
+                className="md:hidden fixed top-4 left-4 z-50 bg-card/80 backdrop-blur-sm border border-primary/20 shadow-sm"
                 onClick={() => setIsOpen(!isOpen)}
             >
                 {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}

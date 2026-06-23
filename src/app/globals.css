@@ -1,53 +1,56 @@
 @import "tailwindcss";
 
+/* ─────────────────────────────────────────────
+   SwiftApp OS — Dark-Luxe Gold (ekosistem SwiftApps)
+   Ink #0B1120 + Gold #C8A24B · Fraunces + Figtree
+   Single luxe theme — token swap transform app-wide.
+   ───────────────────────────────────────────── */
+
 :root {
-  --background: #ffffff;
-  --foreground: #0f172a;
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --popover: #ffffff;
-  --popover-foreground: #0f172a;
-  --primary: #4f46e5;
-  /* Indigo-600 */
-  --primary-foreground: #f8fafc;
-  --secondary: #f1f5f9;
-  --secondary-foreground: #0f172a;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --accent: #f1f5f9;
-  --accent-foreground: #0f172a;
-  --destructive: #ef4444;
+  --background: #0b1120;            /* ink */
+  --foreground: #f4f1ea;           /* cream */
+  --card: #131c30;                 /* lifted ink (glass base @ /50) */
+  --card-foreground: #f4f1ea;
+  --popover: #0f1626;
+  --popover-foreground: #f4f1ea;
+  --primary: #c8a24b;              /* gold */
+  --primary-foreground: #0b1120;   /* ink text on gold */
+  --secondary: #1a2336;
+  --secondary-foreground: #f4f1ea;
+  --muted: #1a2336;
+  --muted-foreground: #94a3b8;     /* slate-400 */
+  --accent: #1f2940;
+  --accent-foreground: #f4f1ea;
+  --destructive: #b91c1c;
   --destructive-foreground: #f8fafc;
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #4f46e5;
+  --border: #1e2740;               /* subtle ink border (gold borders = border-primary/X) */
+  --input: #1e2740;
+  --ring: #c8a24b;                 /* gold focus ring */
   --radius: 0.75rem;
 }
 
+/* Mirror — app has no theme toggle; keep .dark identical so either state is luxe */
 .dark {
-  --background: #020617;
-  /* Slate-950 */
-  --foreground: #f8fafc;
-  --card: #0f172a;
-  /* Slate-900 */
-  --card-foreground: #f8fafc;
-  --popover: #0f172a;
-  --popover-foreground: #f8fafc;
-  --primary: #6366f1;
-  /* Indigo-500 */
-  --primary-foreground: #f8fafc;
-  --secondary: #1e293b;
-  /* Slate-800 */
-  --secondary-foreground: #f8fafc;
-  --muted: #1e293b;
+  --background: #0b1120;
+  --foreground: #f4f1ea;
+  --card: #131c30;
+  --card-foreground: #f4f1ea;
+  --popover: #0f1626;
+  --popover-foreground: #f4f1ea;
+  --primary: #c8a24b;
+  --primary-foreground: #0b1120;
+  --secondary: #1a2336;
+  --secondary-foreground: #f4f1ea;
+  --muted: #1a2336;
   --muted-foreground: #94a3b8;
-  --accent: #1e293b;
-  --accent-foreground: #f8fafc;
-  --destructive: #7f1d1d;
+  --accent: #1f2940;
+  --accent-foreground: #f4f1ea;
+  --destructive: #b91c1c;
   --destructive-foreground: #f8fafc;
-  --border: #1e293b;
-  --input: #1e293b;
-  --ring: #6366f1;
+  --border: #1e2740;
+  --input: #1e2740;
+  --ring: #c8a24b;
+  --radius: 0.75rem;
 }
 
 @theme inline {
@@ -73,10 +76,49 @@
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
+  /* Typography — next/font vars from layout.tsx */
+  --font-sans: var(--font-figtree), system-ui, sans-serif;
+  --font-serif: var(--font-fraunces), Georgia, serif;
+}
+
+html {
+  background-color: var(--background);
 }
 
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  /* subtle gold glow from top — premium depth */
+  background-image: radial-gradient(60% 50% at 50% -10%, rgba(200, 162, 75, 0.08), transparent 70%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* ── Luxe utilities ── */
+
+/* Serif display headings — opt-in: add class="font-display" to any heading */
+.font-display {
+  font-family: var(--font-serif);
+  letter-spacing: -0.01em;
+}
+
+/* Gold gradient text — for hero numbers / key figures */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #e6c970 0%, #c8a24b 55%, #a8842f 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Glass card with gold hairline — alternative to inline bg-card/50 stacks */
+.luxe-card {
+  background-color: rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(200, 162, 75, 0.12);
+}
+
+/* Gold glow ring — for active / hero elements */
+.luxe-glow {
+  box-shadow: 0 0 0 1px rgba(200, 162, 75, 0.10), 0 12px 48px -16px rgba(200, 162, 75, 0.18);
 }

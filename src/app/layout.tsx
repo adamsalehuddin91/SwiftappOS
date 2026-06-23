@@ -1,12 +1,14 @@
 
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Figtree, Fraunces } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
 import { MobileSidebar } from "@/components/MobileSidebar";
 import { Toaster } from "sonner";
 
-const inter = Inter({ subsets: ["latin"] });
+// Dark-Luxe typography — Figtree (UI/body) + Fraunces (display/serif headings)
+const figtree = Figtree({ subsets: ["latin"], variable: "--font-figtree", display: "swap" });
+const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces", display: "swap" });
 
 export const metadata: Metadata = {
   title: "SwiftApp OS",
@@ -19,8 +21,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" className={`${figtree.variable} ${fraunces.variable}`}>
+      <body className="font-sans antialiased">
         <div className="flex min-h-screen w-full">
           {/* Desktop Sidebar */}
           <div className="hidden md:block">
@@ -30,11 +32,11 @@ export default function RootLayout({
           {/* Mobile Sidebar */}
           <MobileSidebar />
 
-          <main className="flex-1 p-6 md:p-10 bg-white w-full">
+          <main className="flex-1 p-6 md:p-10 w-full">
             {children}
           </main>
         </div>
-        <Toaster richColors position="top-right" />
+        <Toaster richColors theme="dark" position="top-right" />
       </body>
     </html>
   );

@@ -257,12 +257,11 @@ export default function EditQuotationPage({ params }: { params: Promise<{ id: st
                                             />
                                         </div>
                                         <div>
-                                            <Label className="text-xs mb-1.5 block text-muted-foreground">Unit Price (RM)</Label>
+                                            <Label className="text-xs mb-1.5 block text-muted-foreground">Unit Price (RM) <span className="opacity-50">— guna negatif utk diskaun</span></Label>
                                             <Input
                                                 type="number"
                                                 value={item.unitPrice}
                                                 onChange={(e) => updateItem(item.id, "unitPrice", Number(e.target.value))}
-                                                min={0}
                                                 className="bg-secondary/20 border-border/50 h-9"
                                             />
                                         </div>

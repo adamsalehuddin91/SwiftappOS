@@ -94,7 +94,8 @@ export const updateInvoiceStatusSchema = z.object({
 const quotationItemSchema = z.object({
   description: z.string().min(1, "Item description required"),
   quantity: z.number().positive("Quantity must be > 0"),
-  unitPrice: z.number().min(0, "Price cannot be negative"),
+  // Allow negative unit price for discount line items (e.g. "Diskaun Keluarga" -9000)
+  unitPrice: z.number(),
 });
 
 export const createQuotationSchema = z.object({

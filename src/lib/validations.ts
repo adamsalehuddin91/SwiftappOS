@@ -186,7 +186,9 @@ export const updateSettingsSchema = z.object({
 
 export const paginationSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(20),
+  // Clamp instead of reject: limit > 100 returns 100 (was throwing → 500, which
+  // silently emptied list fetches like the invoice project picker at ?limit=999).
+  limit: z.coerce.number().int().positive().default(20).transform((n) => Math.min(n, 100)),
   search: z.string().optional().default(""),
   status: z.string().optional().default(""),
 });

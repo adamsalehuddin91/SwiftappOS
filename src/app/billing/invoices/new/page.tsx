@@ -55,7 +55,7 @@ function NewInvoicePageInner() {
     const projectIdFromUrl = searchParams.get("projectId");
 
     Promise.all([
-      fetch("/api/projects?limit=999").then((r) => r.json()),
+      fetch("/api/projects?limit=100").then((r) => r.json()),
       fetch("/api/settings").then((r) => r.json()),
     ])
       .then(([projectsData, settingsData]) => {

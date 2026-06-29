@@ -129,6 +129,11 @@ function NewInvoicePageInner() {
           projectId: selectedProjectId,
           type: selectedStageData.type,
           amount: selectedStage === "Monthly" ? customAmount : selectedStageData.amount,
+          // Carry the linked project's client details onto the invoice so the
+          // invoice/PDF shows the real client (not just "Valued Client").
+          clientName: project?.client_name || project?.name || null,
+          clientEmail: project?.client_email || null,
+          clientBrn: project?.client_brn || null,
           items: [
             {
               description: itemDescription,

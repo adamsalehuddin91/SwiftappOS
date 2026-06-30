@@ -185,11 +185,13 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
     clientName: invoice.client_name || "Valued Client",
     clientEmail: invoice.client_email || "",
     clientBrn: invoice.client_brn || "",
+    dueDate: invoice.due_date,
     items: invoice.items && invoice.items.length > 0
       ? invoice.items
       : [{ description: `${invoice.project_name ?? ""} - ${invoice.type} Billing`, quantity: 1, unitPrice: invoice.amount }],
     total: invoice.amount,
-    notes: INVOICE_TC,
+    // Show the invoice's own saved notes/terms; fall back to the standard T&C.
+    notes: invoice.notes || INVOICE_TC,
   };
 
   const statusColors: Record<string, string> = {

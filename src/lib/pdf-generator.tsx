@@ -346,11 +346,27 @@ export const PdfDocument = ({ type, data, companyDetails }: PdfProps) => {
     }
 
     const items = (data.items as { description: string; quantity: number; unitPrice: number }[]) || [];
-    const subtotal = items.reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0);
+    const itemsSubtotal = items.reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0);
     const hasSST = !!companyDetails?.enableSst;
     const sstRate = 0.08;
-    const sstAmount = hasSST ? subtotal * sstRate : 0;
-    const grandTotal = hasSST ? subtotal + sstAmount : subtotal;
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+
+    // For invoices the stored `amount` (data.total) is authoritative — the PDF
+    // grand total MUST equal what's shown on screen and tracked for payment.
+    // When SST is enabled we treat that amount as SST-inclusive and back-compute
+    // the SST portion, so totals never drift apart.
+    let subtotal: number;
+    let sstAmount: number;
+    let grandTotal: number;
+    if (type === 'Invoice' && typeof data.total === 'number') {
+        grandTotal = data.total;
+        subtotal = hasSST ? round2(grandTotal / (1 + sstRate)) : grandTotal;
+        sstAmount = round2(grandTotal - subtotal);
+    } else {
+        subtotal = itemsSubtotal;
+        sstAmount = hasSST ? round2(subtotal * sstRate) : 0;
+        grandTotal = round2(subtotal + sstAmount);
+    }
 
     const showBankDetails = (type === 'Invoice' || type === 'Quotation') && (companyDetails?.bankName || companyDetails?.bankAccount);
 
@@ -391,8 +407,12 @@ export const PdfDocument = ({ type, data, companyDetails }: PdfProps) => {
                             </View>
                             {type === 'Invoice' && (
                                 <View style={styles.docInfoRow}>
-                                    <Text style={styles.docInfoLabel}>Terms</Text>
-                                    <Text style={styles.docInfoValue}>C.O.D</Text>
+                                    <Text style={styles.docInfoLabel}>Due Date</Text>
+                                    <Text style={styles.docInfoValue}>
+                                        {data.dueDate
+                                            ? new Date(data.dueDate).toLocaleDateString('en-MY')
+                                            : 'Upon Receipt'}
+                                    </Text>
                                 </View>
                             )}
                             {type === 'Quotation' && data.validUntil && (

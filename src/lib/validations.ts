@@ -55,6 +55,9 @@ export const updateMilestoneSchema = z.object({
 export const createInvoiceSchema = z.object({
   projectId: z.string().uuid("Invalid project ID").optional().nullable(),
   milestoneId: z.string().uuid().optional().nullable(),
+  // Milestones billed by this invoice — used to mark exactly these as Invoiced
+  // (instead of bluntly marking every Completed milestone on the project).
+  milestoneIds: z.array(z.string().uuid()).optional(),
   type: InvoiceTypeEnum,
   amount: z.coerce.number().positive("Amount must be greater than 0"),
   dueDate: z.string().optional().nullable(),

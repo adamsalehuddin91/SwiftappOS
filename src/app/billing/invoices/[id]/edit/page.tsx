@@ -109,6 +109,15 @@ export default function EditInvoicePage({ params }: { params: Promise<{ id: stri
             toast.error("Client name is required");
             return;
         }
+        // Drop blank rows and coerce qty>=1 so the API's item schema (description
+        // required, quantity positive) never rejects the save with a 400.
+        const cleanItems = items
+            .filter((it) => it.description.trim())
+            .map(({ description, quantity, unitPrice }) => ({
+                description: description.trim(),
+                quantity: Math.max(1, Number(quantity) || 1),
+                unitPrice: Number(unitPrice) || 0,
+            }));
         setSaving(true);
         try {
             const res = await fetch(`/api/invoices/${id}`, {
@@ -117,19 +126,15 @@ export default function EditInvoicePage({ params }: { params: Promise<{ id: stri
                 body: JSON.stringify({
                     projectId: selectedProjectId || null,
                     type,
-                    amount: items.length > 0 ? calculateTotal() : amount,
+                    amount: cleanItems.length > 0
+                        ? cleanItems.reduce((s, it) => s + it.quantity * it.unitPrice, 0)
+                        : amount,
                     dueDate: dueDate || undefined,
                     notes,
                     clientName,
                     clientEmail: clientEmail || undefined,
                     clientBrn: clientBrn || undefined,
-                    items: items.length > 0
-                        ? items.map(({ description, quantity, unitPrice }) => ({
-                              description,
-                              quantity,
-                              unitPrice,
-                          }))
-                        : undefined,
+                    items: cleanItems.length > 0 ? cleanItems : undefined,
                 }),
             });
             if (res.ok) {

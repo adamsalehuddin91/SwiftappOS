@@ -4,13 +4,13 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, CheckCircle2, Loader2, Zap, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, Plus, Trash2, ListChecks } from "lucide-react";
 import Link from "next/link";
-import { Project } from "@/types";
+import { Project, Milestone } from "@/types";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { PdfDocument } from "@/lib/pdf-generator";
-import { INVOICE_TC, SYSTEM_TYPES, buildInvoiceDescription } from "@/lib/billing-presets";
+import { INVOICE_TC, QUOTATION_PRESETS } from "@/lib/billing-presets";
 
 const PDFDownloadLink = dynamic(
   () => import("@react-pdf/renderer").then((mod) => mod.PDFDownloadLink),
@@ -26,16 +26,22 @@ const inputCls =
 type Mode = "project" | "manual";
 type LineItem = { description: string; quantity: number; unitPrice: number };
 const INVOICE_TYPES = ["Deposit", "Progress", "Final", "Monthly"] as const;
+type InvType = (typeof INVOICE_TYPES)[number];
 
-type Stage = { id: string; label: string; amount: number; type: (typeof INVOICE_TYPES)[number] };
 const round2 = (n: number) => Math.round(n * 100) / 100;
-// Preset billing phases — amounts are editable & each phase removable.
-const defaultStages = (base: number): Stage[] => [
-  { id: "Deposit", label: "Deposit (50%)", amount: round2(base * 0.5), type: "Deposit" },
-  { id: "Progress", label: "Progress (25%)", amount: round2(base * 0.25), type: "Progress" },
-  { id: "Final", label: "Handover (25%)", amount: round2(base * 0.25), type: "Final" },
-  { id: "Monthly", label: "Monthly Retainer", amount: 0, type: "Monthly" },
-];
+const todayPlus = (days: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+
+const msStatusColor: Record<string, string> = {
+  Completed: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+  Invoiced: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+  Paid: "bg-violet-500/10 text-violet-600 border-violet-500/20",
+  "In Progress": "bg-amber-500/10 text-amber-600 border-amber-500/20",
+  Pending: "bg-slate-500/10 text-slate-500 border-slate-500/20",
+};
 
 function NewInvoicePageInner() {
   const router = useRouter();
@@ -44,17 +50,21 @@ function NewInvoicePageInner() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
-  const [selectedStage, setSelectedStage] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [stages, setStages] = useState<Stage[]>(defaultStages(10000));
-  const [selectedSystemId, setSelectedSystemId] = useState<string>("");
   const [companyDetails, setCompanyDetails] = useState<any>(null);
-  const [milestoneTotal, setMilestoneTotal] = useState<number>(0);
+  const [dueDate, setDueDate] = useState<string>(todayPlus(7));
+
+  // ── Project (milestone-based) state ──
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [milestonesLoading, setMilestonesLoading] = useState(false);
+  const [selectedMs, setSelectedMs] = useState<string[]>([]);
+  const [msAmounts, setMsAmounts] = useState<Record<string, number>>({});
+  const [projectType, setProjectType] = useState<InvType>("Progress");
 
   // ── Manual (ad-hoc) invoice state ──
   const [manualProjectId, setManualProjectId] = useState<string>(""); // optional link
-  const [manualType, setManualType] = useState<(typeof INVOICE_TYPES)[number]>("Final");
+  const [manualType, setManualType] = useState<InvType>("Final");
   const [manualClient, setManualClient] = useState({ name: "", email: "", brn: "" });
   const [manualItems, setManualItems] = useState<LineItem[]>([
     { description: "Baki pembayaran (selepas siap & live)", quantity: 1, unitPrice: 0 },
@@ -74,7 +84,11 @@ function NewInvoicePageInner() {
         if (projectIdFromUrl && list.some((p: Project) => p.id === projectIdFromUrl)) {
           setSelectedProjectId(projectIdFromUrl);
         }
-        if (settingsData && !settingsData.error) setCompanyDetails(settingsData);
+        if (settingsData && !settingsData.error) {
+          // Make a relative logo path absolute so @react-pdf can fetch it.
+          if (settingsData.logoUrl?.startsWith("/")) settingsData.logoUrl = window.location.origin + settingsData.logoUrl;
+          setCompanyDetails(settingsData);
+        }
       })
       .catch(() => toast.error("Failed to load projects"))
       .finally(() => setLoading(false));
@@ -82,35 +96,40 @@ function NewInvoicePageInner() {
 
   const project = projects.find((p) => p.id === selectedProjectId);
 
-  // Fetch milestone total when project changes → seed preset phase amounts.
+  // Fetch milestones when project changes → pre-select billable (Completed) ones.
   useEffect(() => {
-    if (!selectedProjectId) { setMilestoneTotal(0); setStages(defaultStages(10000)); return; }
+    if (!selectedProjectId) { setMilestones([]); setSelectedMs([]); setMsAmounts({}); return; }
+    setMilestonesLoading(true);
     fetch(`/api/projects/${selectedProjectId}`)
       .then((r) => r.json())
       .then((d) => {
-        const total = (d.milestones ?? []).reduce((s: number, m: { amount: number }) => s + Number(m.amount), 0);
-        setMilestoneTotal(total);
-        setStages(defaultStages(total > 0 ? total : 10000));
+        const ms: Milestone[] = d.milestones ?? [];
+        setMilestones(ms);
+        const amounts: Record<string, number> = {};
+        ms.forEach((m) => { amounts[m.id] = round2(Number(m.amount) || 0); });
+        setMsAmounts(amounts);
+        // Default-select milestones that are Completed (ready to bill, not yet invoiced).
+        setSelectedMs(ms.filter((m) => m.status === "Completed").map((m) => m.id));
       })
-      .catch(() => { setMilestoneTotal(0); setStages(defaultStages(10000)); });
+      .catch(() => { setMilestones([]); setSelectedMs([]); setMsAmounts({}); })
+      .finally(() => setMilestonesLoading(false));
   }, [selectedProjectId]);
 
-  const selectedStageData = stages.find((s) => s.id === selectedStage);
-
-  const updateStageAmount = (id: string, amount: number) =>
-    setStages((s) => s.map((st) => (st.id === id ? { ...st, amount } : st)));
-  const removeStage = (id: string) => {
-    setStages((s) => s.filter((st) => st.id !== id));
-    if (selectedStage === id) setSelectedStage("");
+  const toggleMs = (id: string) => {
+    setSaved(false);
+    setSelectedMs((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   };
-  const resetStages = () => setStages(defaultStages(milestoneTotal > 0 ? milestoneTotal : 10000));
-  const selectedSystem = SYSTEM_TYPES.find((s) => s.id === selectedSystemId);
-  const itemDescription = selectedStageData && selectedSystem
-    ? buildInvoiceDescription(selectedStageData.id, selectedSystem.short)
-    : selectedStageData?.label || "";
+  const setMsAmount = (id: string, amount: number) =>
+    setMsAmounts((a) => ({ ...a, [id]: amount }));
+
+  const projectItems: LineItem[] = milestones
+    .filter((m) => selectedMs.includes(m.id))
+    .map((m) => ({ description: m.name, quantity: 1, unitPrice: round2(msAmounts[m.id] ?? (Number(m.amount) || 0)) }));
+  const projectTotal = round2(projectItems.reduce((s, it) => s + it.quantity * it.unitPrice, 0));
+  const projectValid = !!selectedProjectId && projectItems.length > 0 && projectTotal > 0;
 
   // ── Manual helpers ──
-  const manualTotal = manualItems.reduce((s, it) => s + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0), 0);
+  const manualTotal = round2(manualItems.reduce((s, it) => s + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0), 0));
   const manualValid =
     manualClient.name.trim().length > 0 &&
     manualItems.some((it) => it.description.trim() && (Number(it.unitPrice) || 0) > 0) &&
@@ -128,8 +147,17 @@ function NewInvoicePageInner() {
     if (p) setManualClient({ name: p.client_name || p.name || "", email: p.client_email || "", brn: p.client_brn || "" });
   };
 
-  async function handleCreateInvoice() {
-    if (!selectedProjectId || !selectedStageData) return;
+  const applyPreset = (presetId: string) => {
+    const preset = QUOTATION_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    setManualItems(preset.items.map((it) => ({ description: it.description, quantity: it.quantity, unitPrice: it.unitPrice })));
+    setManualNotes(preset.notes);
+    setManualType("Final");
+    setSaved(false);
+  };
+
+  async function handleCreateProject() {
+    if (!projectValid) return;
     setSaving(true);
     try {
       const res = await fetch("/api/invoices", {
@@ -137,20 +165,16 @@ function NewInvoicePageInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           projectId: selectedProjectId,
-          type: selectedStageData.type,
-          amount: selectedStageData.amount,
-          // Carry the linked project's client details onto the invoice so the
-          // invoice/PDF shows the real client (not just "Valued Client").
+          milestoneIds: selectedMs,
+          type: projectType,
+          amount: projectTotal,
+          dueDate: dueDate || undefined,
+          items: projectItems,
+          // Carry the linked project's client details onto the invoice.
           clientName: project?.client_name || project?.name || null,
           clientEmail: project?.client_email || null,
           clientBrn: project?.client_brn || null,
-          items: [
-            {
-              description: itemDescription,
-              quantity: 1,
-              unitPrice: selectedStageData.amount,
-            },
-          ],
+          notes: INVOICE_TC,
         }),
       });
       if (res.ok) {
@@ -160,7 +184,7 @@ function NewInvoicePageInner() {
         router.push(`/billing/invoices/${created.id}`);
       } else {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Failed to create invoice");
+        toast.error(typeof err.error === "string" ? err.error : "Failed to create invoice");
       }
     } catch {
       toast.error("Failed to create invoice. Please try again.");
@@ -183,6 +207,7 @@ function NewInvoicePageInner() {
           projectId: manualProjectId || null,
           type: manualType,
           amount: manualTotal,
+          dueDate: dueDate || undefined,
           items,
           clientName: manualClient.name.trim(),
           clientEmail: manualClient.email.trim() || null,
@@ -216,7 +241,7 @@ function NewInvoicePageInner() {
         </Link>
         <div>
           <h1 className="text-3xl font-black tracking-tight text-foreground">Generate Invoice</h1>
-          <p className="text-sm text-muted-foreground mt-1">Bill clients for completed milestones — atau invois manual.</p>
+          <p className="text-sm text-muted-foreground mt-1">Bill milestone yang dah siap — atau invois manual.</p>
         </div>
       </div>
 
@@ -290,93 +315,81 @@ function NewInvoicePageInner() {
                 <Card className="border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5 animate-in slide-in-from-bottom-4">
                   <CardHeader className="border-b border-border/50 pb-4">
                     <CardTitle className="text-base font-bold flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
-                      <Zap className="h-4 w-4 text-primary" />
-                      Jenis Sistem
+                      <ListChecks className="h-4 w-4 text-primary" />
+                      Pilih Milestone
                     </CardTitle>
-                    <CardDescription>Pilih jenis sistem untuk jana deskripsi item secara automatik.</CardDescription>
+                    <CardDescription>Tick milestone yang nak di-invois. Milestone <span className="font-semibold text-emerald-600">Completed</span> dipilih automatik. Nilai boleh edit.</CardDescription>
                   </CardHeader>
-                  <CardContent className="pt-5">
-                    <div className="flex flex-wrap gap-2">
-                      {SYSTEM_TYPES.map((sys) => (
-                        <button
-                          key={sys.id}
-                          type="button"
-                          onClick={() => { setSelectedSystemId(sys.id); setSaved(false); }}
-                          className={`px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors ${
-                            selectedSystemId === sys.id
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "border-primary/30 bg-primary/5 text-primary hover:bg-primary/15"
-                          }`}
-                        >
-                          {sys.label}
-                        </button>
-                      ))}
-                      {selectedSystemId && (
-                        <button
-                          type="button"
-                          onClick={() => setSelectedSystemId("")}
-                          className="px-3 py-1.5 text-xs font-semibold rounded-full border border-muted-foreground/30 text-muted-foreground hover:bg-secondary/50 transition-colors"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                    {selectedStageData && selectedSystem && (
-                      <div className="mt-3 p-3 rounded-lg bg-secondary/20 border border-border/50">
-                        <p className="text-xs text-muted-foreground mb-1 font-semibold uppercase tracking-wide">Item Description Preview</p>
-                        <p className="text-sm font-medium text-foreground">{itemDescription}</p>
+                  <CardContent className="pt-6">
+                    {milestonesLoading ? (
+                      <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                    ) : milestones.length === 0 ? (
+                      <div className="text-center py-8 text-sm text-muted-foreground">
+                        Project ni belum ada milestone. Tambah milestone dalam project dulu, atau guna{" "}
+                        <button onClick={() => setMode("manual")} className="text-primary font-bold hover:underline">Invois Manual</button>.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {milestones.map((m) => {
+                          const checked = selectedMs.includes(m.id);
+                          return (
+                            <div
+                              key={m.id}
+                              onClick={() => toggleMs(m.id)}
+                              className={`flex items-center gap-3 p-4 rounded-xl border transition-all cursor-pointer ${checked
+                                ? "border-primary bg-primary/10 ring-1 ring-primary"
+                                : "border-border/50 hover:bg-secondary/40"
+                                }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleMs(m.id)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="h-4 w-4 shrink-0 accent-primary"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-foreground truncate">{m.name}</div>
+                                <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${msStatusColor[m.status] ?? msStatusColor.Pending}`}>
+                                  {m.status}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                <span className="text-xs text-muted-foreground">RM</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={msAmounts[m.id] ?? 0}
+                                  onChange={(e) => { setMsAmount(m.id, parseFloat(e.target.value) || 0); setSaved(false); }}
+                                  className={`${inputCls} w-32 text-right`}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </CardContent>
                 </Card>
               )}
 
-              {project && (
-                <Card className="border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5 animate-in slide-in-from-bottom-4">
+              {project && milestones.length > 0 && (
+                <Card className="border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5">
                   <CardHeader className="border-b border-border/50 pb-4">
-                    <CardTitle className="text-base font-bold uppercase tracking-wider text-muted-foreground">Billing Phase</CardTitle>
-                    <CardDescription>Pilih phase · edit nilai sendiri · buang yang tak guna. Template tiap phase dah preset.</CardDescription>
+                    <CardTitle className="text-base font-bold uppercase tracking-wider text-muted-foreground">Jenis &amp; Tarikh</CardTitle>
                   </CardHeader>
-                  <CardContent className="pt-6">
-                    {stages.length === 0 ? (
-                      <div className="text-center py-6 text-sm text-muted-foreground">
-                        Semua phase dibuang. <button onClick={resetStages} className="text-primary font-bold hover:underline">Reset phase</button>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {stages.map((stage) => (
-                          <div
-                            key={stage.id}
-                            onClick={() => { setSelectedStage(stage.id); setSaved(false); }}
-                            className={`flex items-center gap-3 p-4 rounded-xl border transition-all cursor-pointer ${selectedStage === stage.id
-                              ? "border-primary bg-primary/10 ring-1 ring-primary"
-                              : "border-border/50 hover:bg-secondary/40"
-                              }`}
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-foreground">{stage.label}</div>
-                              <div className="text-xs text-muted-foreground">{stage.type} · template preset</div>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <span className="text-xs text-muted-foreground">RM</span>
-                              <input
-                                type="number"
-                                min={0}
-                                step="0.01"
-                                value={stage.amount}
-                                onChange={(e) => { updateStageAmount(stage.id, parseFloat(e.target.value) || 0); setSaved(false); }}
-                                onFocus={() => { setSelectedStage(stage.id); setSaved(false); }}
-                                className={`${inputCls} w-32 text-right`}
-                              />
-                              <button type="button" onClick={() => removeStage(stage.id)} className="h-9 w-9 flex items-center justify-center text-muted-foreground hover:text-destructive" aria-label="Buang phase">
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                        <button onClick={resetStages} className="text-xs text-muted-foreground hover:text-primary hover:underline">↺ Reset phase ke preset</button>
-                      </div>
-                    )}
+                  <CardContent className="pt-6 grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold uppercase text-muted-foreground mb-1.5 block">Jenis Invois</label>
+                      <select className={inputCls} value={projectType} onChange={(e) => { setProjectType(e.target.value as InvType); setSaved(false); }}>
+                        {INVOICE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold uppercase text-muted-foreground mb-1.5 block">Tarikh Akhir Bayaran</label>
+                      <input type="date" className={inputCls} value={dueDate} onChange={(e) => { setDueDate(e.target.value); setSaved(false); }} />
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -418,15 +431,22 @@ function NewInvoicePageInner() {
               <Card className="border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5">
                 <CardHeader className="border-b border-border/50 pb-4">
                   <CardTitle className="text-base font-bold uppercase tracking-wider text-muted-foreground">Item Invois</CardTitle>
-                  <CardDescription>Tambah satu atau lebih item. Cth: &quot;Baki pembayaran (50%)&quot;.</CardDescription>
+                  <CardDescription>Tambah item sendiri, atau guna preset sistem untuk auto-isi.</CardDescription>
                 </CardHeader>
                 <CardContent className="pt-6 space-y-3">
+                  <div>
+                    <label className="text-xs font-bold uppercase text-muted-foreground mb-1.5 block">Preset Sistem (pilihan)</label>
+                    <select className={inputCls} defaultValue="" onChange={(e) => { if (e.target.value) applyPreset(e.target.value); }}>
+                      <option value="">— Isi sendiri —</option>
+                      {QUOTATION_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label} — RM {p.items[0].unitPrice.toLocaleString()}</option>)}
+                    </select>
+                  </div>
                   <div className="hidden md:grid grid-cols-[1fr_80px_120px_40px] gap-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-1">
                     <span>Deskripsi</span><span>Kuantiti</span><span>Harga (RM)</span><span></span>
                   </div>
                   {manualItems.map((it, idx) => (
-                    <div key={idx} className="grid grid-cols-1 md:grid-cols-[1fr_80px_120px_40px] gap-2 items-center">
-                      <input className={inputCls} value={it.description} onChange={(e) => { updateItem(idx, { description: e.target.value }); setSaved(false); }} placeholder="Deskripsi item" />
+                    <div key={idx} className="grid grid-cols-1 md:grid-cols-[1fr_80px_120px_40px] gap-2 items-start">
+                      <textarea className={`${inputCls} h-10 py-2 min-h-10`} value={it.description} onChange={(e) => { updateItem(idx, { description: e.target.value }); setSaved(false); }} placeholder="Deskripsi item" />
                       <input type="number" min={1} className={inputCls} value={it.quantity} onChange={(e) => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })} />
                       <input type="number" min={0} step="0.01" className={inputCls} value={it.unitPrice} onChange={(e) => { updateItem(idx, { unitPrice: parseFloat(e.target.value) || 0 }); setSaved(false); }} />
                       <button type="button" onClick={() => removeItem(idx)} disabled={manualItems.length === 1} className="h-10 flex items-center justify-center text-muted-foreground hover:text-destructive disabled:opacity-30">
@@ -442,14 +462,20 @@ function NewInvoicePageInner() {
 
               <Card className="border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5">
                 <CardHeader className="border-b border-border/50 pb-4">
-                  <CardTitle className="text-base font-bold uppercase tracking-wider text-muted-foreground">Jenis &amp; Nota</CardTitle>
+                  <CardTitle className="text-base font-bold uppercase tracking-wider text-muted-foreground">Jenis, Tarikh &amp; Nota</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6 space-y-4">
-                  <div>
-                    <label className="text-xs font-bold uppercase text-muted-foreground mb-1.5 block">Jenis Invois</label>
-                    <select className={inputCls} value={manualType} onChange={(e) => setManualType(e.target.value as (typeof INVOICE_TYPES)[number])}>
-                      {INVOICE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                    </select>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold uppercase text-muted-foreground mb-1.5 block">Jenis Invois</label>
+                      <select className={inputCls} value={manualType} onChange={(e) => setManualType(e.target.value as InvType)}>
+                        {INVOICE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold uppercase text-muted-foreground mb-1.5 block">Tarikh Akhir Bayaran</label>
+                      <input type="date" className={inputCls} value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                    </div>
                   </div>
                   <div>
                     <label className="text-xs font-bold uppercase text-muted-foreground mb-1.5 block">Nota / Terma</label>
@@ -474,8 +500,12 @@ function NewInvoicePageInner() {
                     <span className="font-bold text-foreground">{project ? project.name : "-"}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Stage</span>
-                    <span className="font-bold text-foreground">{selectedStageData ? selectedStageData.label : "-"}</span>
+                    <span className="text-muted-foreground">Milestone</span>
+                    <span className="font-bold text-foreground">{projectItems.length}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Due</span>
+                    <span className="font-bold text-foreground">{dueDate || "-"}</span>
                   </div>
                 </>
               ) : (
@@ -488,55 +518,55 @@ function NewInvoicePageInner() {
                     <span className="text-muted-foreground">Item</span>
                     <span className="font-bold text-foreground">{manualItems.filter((i) => i.description.trim()).length}</span>
                   </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Due</span>
+                    <span className="font-bold text-foreground">{dueDate || "-"}</span>
+                  </div>
                 </>
               )}
               <div className="pt-4 border-t border-border/50 flex justify-between">
                 <span className="font-medium text-muted-foreground">Total (MYR)</span>
                 <span className="font-black text-xl text-foreground">
-                  {mode === "project"
-                    ? (selectedStageData ? selectedStageData.amount.toLocaleString("en-MY", { minimumFractionDigits: 2 }) : "0.00")
-                    : manualTotal.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
+                  {(mode === "project" ? projectTotal : manualTotal).toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                 </span>
               </div>
 
               {/* Project mode actions */}
-              {mode === "project" && selectedProjectId && selectedStageData && !saved && (
-                <div className="space-y-2">
-                  <Button className="w-full shadow-lg shadow-primary/25" onClick={handleCreateInvoice} disabled={saving}>
-                    {saving ? "Creating..." : "Create Invoice"}
-                  </Button>
-                  <PDFDownloadLink
-                    document={
-                      <PdfDocument
-                        type="Invoice"
-                        data={{
-                          number: `INV-${new Date().getFullYear()}-DRAFT`,
-                          clientName: project?.client_name || project?.name || "Client",
-                          clientEmail: project?.client_email || "billing@client.com",
-                          clientBrn: project?.client_brn,
-                          items: [{
-                            description: itemDescription,
-                            quantity: 1,
-                            unitPrice: selectedStageData.amount,
-                          }],
-                          total: selectedStageData.amount,
-                          notes: INVOICE_TC,
-                        }}
-                        companyDetails={companyDetails}
-                      />
-                    }
-                    fileName={`invoice-${selectedProjectId}-${selectedStage}.pdf`}
-                  >
-                    {({ loading: pdfLoading }) => (
-                      <Button className="w-full" variant="outline" disabled={pdfLoading}>
-                        {pdfLoading ? "Generating PDF..." : "Download PDF Preview"}
-                      </Button>
-                    )}
-                  </PDFDownloadLink>
-                </div>
-              )}
-              {mode === "project" && (!selectedProjectId || !selectedStageData) && (
-                <Button className="w-full shadow-lg shadow-primary/25" disabled>Generate Invoice</Button>
+              {mode === "project" && (
+                projectValid && !saved ? (
+                  <div className="space-y-2">
+                    <Button className="w-full shadow-lg shadow-primary/25" onClick={handleCreateProject} disabled={saving}>
+                      {saving ? "Creating..." : "Create Invoice"}
+                    </Button>
+                    <PDFDownloadLink
+                      document={
+                        <PdfDocument
+                          type="Invoice"
+                          data={{
+                            number: `INV-${new Date().getFullYear()}-DRAFT`,
+                            clientName: project?.client_name || project?.name || "Client",
+                            clientEmail: project?.client_email || "",
+                            clientBrn: project?.client_brn,
+                            dueDate,
+                            items: projectItems,
+                            total: projectTotal,
+                            notes: INVOICE_TC,
+                          }}
+                          companyDetails={companyDetails}
+                        />
+                      }
+                      fileName={`invoice-${selectedProjectId}-draft.pdf`}
+                    >
+                      {({ loading: pdfLoading }) => (
+                        <Button className="w-full" variant="outline" disabled={pdfLoading}>
+                          {pdfLoading ? "Generating PDF..." : "Download PDF Preview"}
+                        </Button>
+                      )}
+                    </PDFDownloadLink>
+                  </div>
+                ) : (
+                  <Button className="w-full shadow-lg shadow-primary/25" disabled>Generate Invoice</Button>
+                )
               )}
 
               {/* Manual mode actions */}
@@ -553,8 +583,9 @@ function NewInvoicePageInner() {
                           data={{
                             number: `INV-${new Date().getFullYear()}-DRAFT`,
                             clientName: manualClient.name || "Client",
-                            clientEmail: manualClient.email || "billing@client.com",
+                            clientEmail: manualClient.email || "",
                             clientBrn: manualClient.brn || undefined,
+                            dueDate,
                             items: manualItems.filter((i) => i.description.trim()).map((i) => ({ description: i.description, quantity: Number(i.quantity) || 1, unitPrice: Number(i.unitPrice) || 0 })),
                             total: manualTotal,
                             notes: manualNotes,

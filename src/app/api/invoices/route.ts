@@ -58,11 +58,15 @@ export async function POST(request: NextRequest) {
     const data = parsed.data;
     const invoiceNumber = await getNextNumber("invoice");
 
+    // Single milestone link: explicit milestoneId, else the sole milestoneIds entry.
+    const linkMilestoneId =
+      data.milestoneId ?? (data.milestoneIds?.length === 1 ? data.milestoneIds[0] : null);
+
     const invoice = await prisma.invoice.create({
       data: {
         invoiceNumber,
         projectId: data.projectId,
-        milestoneId: data.milestoneId ?? null,
+        milestoneId: linkMilestoneId,
         type: data.type,
         amount: data.amount,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
@@ -75,8 +79,15 @@ export async function POST(request: NextRequest) {
       include: { project: true },
     });
 
-    // Auto-sync: mark project's Completed milestones → Invoiced
-    if (data.projectId) {
+    // Auto-sync milestones → Invoiced.
+    // If specific milestones were billed, mark exactly those; otherwise fall
+    // back to the legacy behaviour of marking every Completed milestone.
+    if (data.milestoneIds && data.milestoneIds.length > 0) {
+      await prisma.milestone.updateMany({
+        where: { id: { in: data.milestoneIds }, status: "Completed" },
+        data: { status: "Invoiced" },
+      });
+    } else if (data.projectId) {
       await prisma.milestone.updateMany({
         where: { projectId: data.projectId, status: "Completed" },
         data: { status: "Invoiced" },

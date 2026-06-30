@@ -27,6 +27,16 @@ type Mode = "project" | "manual";
 type LineItem = { description: string; quantity: number; unitPrice: number };
 const INVOICE_TYPES = ["Deposit", "Progress", "Final", "Monthly"] as const;
 
+type Stage = { id: string; label: string; amount: number; type: (typeof INVOICE_TYPES)[number] };
+const round2 = (n: number) => Math.round(n * 100) / 100;
+// Preset billing phases — amounts are editable & each phase removable.
+const defaultStages = (base: number): Stage[] => [
+  { id: "Deposit", label: "Deposit (50%)", amount: round2(base * 0.5), type: "Deposit" },
+  { id: "Progress", label: "Progress (25%)", amount: round2(base * 0.25), type: "Progress" },
+  { id: "Final", label: "Handover (25%)", amount: round2(base * 0.25), type: "Final" },
+  { id: "Monthly", label: "Monthly Retainer", amount: 0, type: "Monthly" },
+];
+
 function NewInvoicePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -37,7 +47,7 @@ function NewInvoicePageInner() {
   const [selectedStage, setSelectedStage] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [customAmount, setCustomAmount] = useState<number>(1000);
+  const [stages, setStages] = useState<Stage[]>(defaultStages(10000));
   const [selectedSystemId, setSelectedSystemId] = useState<string>("");
   const [companyDetails, setCompanyDetails] = useState<any>(null);
   const [milestoneTotal, setMilestoneTotal] = useState<number>(0);
@@ -72,28 +82,28 @@ function NewInvoicePageInner() {
 
   const project = projects.find((p) => p.id === selectedProjectId);
 
-  // Fetch milestone total when project changes
+  // Fetch milestone total when project changes → seed preset phase amounts.
   useEffect(() => {
-    if (!selectedProjectId) { setMilestoneTotal(0); return; }
+    if (!selectedProjectId) { setMilestoneTotal(0); setStages(defaultStages(10000)); return; }
     fetch(`/api/projects/${selectedProjectId}`)
       .then((r) => r.json())
       .then((d) => {
         const total = (d.milestones ?? []).reduce((s: number, m: { amount: number }) => s + Number(m.amount), 0);
         setMilestoneTotal(total);
+        setStages(defaultStages(total > 0 ? total : 10000));
       })
-      .catch(() => setMilestoneTotal(0));
+      .catch(() => { setMilestoneTotal(0); setStages(defaultStages(10000)); });
   }, [selectedProjectId]);
 
-  const baseTotal = milestoneTotal > 0 ? milestoneTotal : 10000;
+  const selectedStageData = stages.find((s) => s.id === selectedStage);
 
-  const billingStages = [
-    { id: "Deposit", label: "Deposit (50%)", amount: Math.round(baseTotal * 0.5 * 100) / 100, type: "Deposit" as const },
-    { id: "Progress", label: "Progress (25%)", amount: Math.round(baseTotal * 0.25 * 100) / 100, type: "Progress" as const },
-    { id: "Final", label: "Handover (25%)", amount: Math.round(baseTotal * 0.25 * 100) / 100, type: "Final" as const },
-    { id: "Monthly", label: "Monthly Retainer", amount: 0, type: "Monthly" as const },
-  ];
-
-  const selectedStageData = billingStages.find((s) => s.id === selectedStage);
+  const updateStageAmount = (id: string, amount: number) =>
+    setStages((s) => s.map((st) => (st.id === id ? { ...st, amount } : st)));
+  const removeStage = (id: string) => {
+    setStages((s) => s.filter((st) => st.id !== id));
+    if (selectedStage === id) setSelectedStage("");
+  };
+  const resetStages = () => setStages(defaultStages(milestoneTotal > 0 ? milestoneTotal : 10000));
   const selectedSystem = SYSTEM_TYPES.find((s) => s.id === selectedSystemId);
   const itemDescription = selectedStageData && selectedSystem
     ? buildInvoiceDescription(selectedStageData.id, selectedSystem.short)
@@ -128,7 +138,7 @@ function NewInvoicePageInner() {
         body: JSON.stringify({
           projectId: selectedProjectId,
           type: selectedStageData.type,
-          amount: selectedStage === "Monthly" ? customAmount : selectedStageData.amount,
+          amount: selectedStageData.amount,
           // Carry the linked project's client details onto the invoice so the
           // invoice/PDF shows the real client (not just "Valued Client").
           clientName: project?.client_name || project?.name || null,
@@ -138,7 +148,7 @@ function NewInvoicePageInner() {
             {
               description: itemDescription,
               quantity: 1,
-              unitPrice: selectedStage === "Monthly" ? customAmount : selectedStageData.amount,
+              unitPrice: selectedStageData.amount,
             },
           ],
         }),
@@ -324,50 +334,49 @@ function NewInvoicePageInner() {
               {project && (
                 <Card className="border-primary/20 bg-card/50 backdrop-blur-md shadow-lg shadow-primary/5 animate-in slide-in-from-bottom-4">
                   <CardHeader className="border-b border-border/50 pb-4">
-                    <CardTitle className="text-base font-bold uppercase tracking-wider text-muted-foreground">Billing Stage</CardTitle>
-                    <CardDescription>Select a stage to invoice.</CardDescription>
+                    <CardTitle className="text-base font-bold uppercase tracking-wider text-muted-foreground">Billing Phase</CardTitle>
+                    <CardDescription>Pilih phase · edit nilai sendiri · buang yang tak guna. Template tiap phase dah preset.</CardDescription>
                   </CardHeader>
                   <CardContent className="pt-6">
-                    <div className="space-y-3">
-                      {billingStages.map((stage) => (
-                        <div key={stage.id} className="space-y-3">
+                    {stages.length === 0 ? (
+                      <div className="text-center py-6 text-sm text-muted-foreground">
+                        Semua phase dibuang. <button onClick={resetStages} className="text-primary font-bold hover:underline">Reset phase</button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {stages.map((stage) => (
                           <div
+                            key={stage.id}
                             onClick={() => { setSelectedStage(stage.id); setSaved(false); }}
-                            className={`flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer ${selectedStage === stage.id
+                            className={`flex items-center gap-3 p-4 rounded-xl border transition-all cursor-pointer ${selectedStage === stage.id
                               ? "border-primary bg-primary/10 ring-1 ring-primary"
                               : "border-border/50 hover:bg-secondary/40"
                               }`}
                           >
-                            <div>
+                            <div className="flex-1 min-w-0">
                               <div className="font-medium text-foreground">{stage.label}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {stage.id === "Monthly"
-                                  ? "Custom Amount"
-                                  : `RM ${stage.amount.toLocaleString()}${milestoneTotal > 0 ? " (dari milestone)" : " (default)"}`}
-                              </div>
+                              <div className="text-xs text-muted-foreground">{stage.type} · template preset</div>
                             </div>
-                            <div className="text-sm font-bold uppercase tracking-wider text-amber-500">
-                              Pending
-                            </div>
-                          </div>
-
-                          {selectedStage === stage.id && stage.id === "Monthly" && (
-                            <div className="pl-4 border-l-2 border-primary/50 ml-2 animate-in slide-in-from-top-2">
-                              <label className="text-xs font-bold uppercase text-muted-foreground mb-2 block">
-                                Monthly Fee (RM)
-                              </label>
+                            <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <span className="text-xs text-muted-foreground">RM</span>
                               <input
                                 type="number"
-                                value={customAmount}
-                                onChange={(e) => setCustomAmount(parseFloat(e.target.value) || 0)}
-                                className={inputCls}
-                                placeholder="Enter monthly retainer amount"
+                                min={0}
+                                step="0.01"
+                                value={stage.amount}
+                                onChange={(e) => { updateStageAmount(stage.id, parseFloat(e.target.value) || 0); setSaved(false); }}
+                                onFocus={() => { setSelectedStage(stage.id); setSaved(false); }}
+                                className={`${inputCls} w-32 text-right`}
                               />
+                              <button type="button" onClick={() => removeStage(stage.id)} className="h-9 w-9 flex items-center justify-center text-muted-foreground hover:text-destructive" aria-label="Buang phase">
+                                <Trash2 className="h-4 w-4" />
+                              </button>
                             </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                          </div>
+                        ))}
+                        <button onClick={resetStages} className="text-xs text-muted-foreground hover:text-primary hover:underline">↺ Reset phase ke preset</button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}
@@ -485,7 +494,7 @@ function NewInvoicePageInner() {
                 <span className="font-medium text-muted-foreground">Total (MYR)</span>
                 <span className="font-black text-xl text-foreground">
                   {mode === "project"
-                    ? (selectedStageData ? (selectedStage === "Monthly" ? customAmount : selectedStageData.amount).toLocaleString("en-MY", { minimumFractionDigits: 2 }) : "0.00")
+                    ? (selectedStageData ? selectedStageData.amount.toLocaleString("en-MY", { minimumFractionDigits: 2 }) : "0.00")
                     : manualTotal.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                 </span>
               </div>
@@ -508,9 +517,9 @@ function NewInvoicePageInner() {
                           items: [{
                             description: itemDescription,
                             quantity: 1,
-                            unitPrice: selectedStage === "Monthly" ? customAmount : selectedStageData.amount,
+                            unitPrice: selectedStageData.amount,
                           }],
-                          total: selectedStage === "Monthly" ? customAmount : selectedStageData.amount,
+                          total: selectedStageData.amount,
                           notes: INVOICE_TC,
                         }}
                         companyDetails={companyDetails}

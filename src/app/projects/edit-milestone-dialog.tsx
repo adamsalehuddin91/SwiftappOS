@@ -13,6 +13,7 @@ import {
 import { Loader2, Settings2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Milestone } from "@/types";
+import { apiErrorMessage } from "@/lib/api-error";
 
 const prismaToDisplay: Record<string, string> = {
     InProgress: "In Progress",
@@ -57,7 +58,7 @@ export default function EditMilestoneDialog({ milestone }: { milestone: Mileston
                 router.refresh();
             } else {
                 const err = await res.json().catch(() => null);
-                toast.error(err?.error || "Failed to update milestone.");
+                toast.error(apiErrorMessage(err, "Failed to update milestone."));
             }
         } catch (error) {
             console.error("Failed to update milestone", error);

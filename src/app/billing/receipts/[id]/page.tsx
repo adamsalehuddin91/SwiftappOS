@@ -9,6 +9,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { PdfDocument } from "@/lib/pdf-generator";
+import { apiErrorMessage } from "@/lib/api-error";
 
 const PDFDownloadLink = dynamic(
     () => import("@react-pdf/renderer").then((mod) => mod.PDFDownloadLink),
@@ -75,7 +76,7 @@ export default function ReceiptViewPage({ params }: { params: Promise<{ id: stri
                 router.push(receipt?.invoice ? `/billing/invoices/${receipt.invoice.id}` : "/billing");
             } else {
                 const err = await res.json().catch(() => null);
-                toast.error(err?.error || "Failed to void receipt.");
+                toast.error(apiErrorMessage(err, "Failed to void receipt."));
             }
         } catch {
             toast.error("Network error.");

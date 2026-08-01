@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Save, Loader2, Image as ImageIcon, Upload, X } from "lucide-react";
 import { toast } from "sonner";
+import { apiErrorMessage } from "@/lib/api-error";
 
 export default function SettingsPage() {
     const [formData, setFormData] = useState({
@@ -93,7 +94,7 @@ export default function SettingsPage() {
             fd.append("logo", file);
             const res = await fetch("/api/settings/logo", { method: "POST", body: fd });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Upload failed");
+            if (!res.ok) throw new Error(apiErrorMessage(data, "Upload failed"));
             setFormData((prev) => ({ ...prev, logoUrl: data.url }));
             toast.success("Logo uploaded. Klik Save Settings untuk simpan.");
         } catch (err: any) {

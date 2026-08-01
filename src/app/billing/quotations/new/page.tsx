@@ -14,6 +14,7 @@ import dynamic from "next/dynamic";
 import { PdfDocument } from "@/lib/pdf-generator";
 import { QUOTATION_PRESETS } from "@/lib/billing-presets";
 import { toast } from "sonner";
+import { apiErrorMessage } from "@/lib/api-error";
 
 const PDFDownloadLink = dynamic(
   () => import("@react-pdf/renderer").then((mod) => mod.PDFDownloadLink),
@@ -136,12 +137,7 @@ function NewQuotationPageInner() {
         if (data?.id) router.push(`/billing/quotations/${data.id}`);
       } else {
         const err = await res.json().catch(() => null);
-        const msg = typeof err?.error === "string"
-          ? err.error
-          : err?.error?.fieldErrors
-            ? Object.entries(err.error.fieldErrors).map(([k, v]) => `${k}: ${(v as string[]).join(", ")}`).join(" | ")
-            : "Failed to save quotation";
-        toast.error(msg);
+        toast.error(apiErrorMessage(err, "Failed to save quotation"));
       }
     } catch {
       toast.error("Network error — could not save quotation");

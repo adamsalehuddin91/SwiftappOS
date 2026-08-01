@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { ArrowLeft, Loader2, Save } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { apiErrorMessage } from "@/lib/api-error";
 
 export default function NewProjectPage() {
     const router = useRouter();
@@ -44,7 +45,7 @@ export default function NewProjectPage() {
 
             if (!res.ok) {
                 const data = await res.json();
-                throw new Error(data.error || "Failed to create project");
+                throw new Error(apiErrorMessage(data, "Failed to create project"));
             }
 
             const newProject = await res.json();

@@ -10,6 +10,7 @@ import dynamic from "next/dynamic";
 import { PdfDocument } from "@/lib/pdf-generator";
 import { Quotation } from "@/types";
 import { toast } from "sonner";
+import { apiErrorMessage } from "@/lib/api-error";
 
 const PDFDownloadLink = dynamic(
     () => import("@react-pdf/renderer").then((mod) => mod.PDFDownloadLink),
@@ -69,7 +70,7 @@ export default function QuotationViewPage({ params }: { params: Promise<{ id: st
                 toast.success(`Quotation marked as ${newStatus}`);
             } else {
                 const err = await res.json().catch(() => null);
-                toast.error(err?.error || `Failed to update status to ${newStatus}`);
+                toast.error(apiErrorMessage(err, `Failed to update status to ${newStatus}`));
             }
         } catch {
             toast.error("Network error — could not update status");
@@ -103,7 +104,7 @@ export default function QuotationViewPage({ params }: { params: Promise<{ id: st
                 router.push(`/billing/invoices/${data.id}`);
             } else {
                 const err = await res.json().catch(() => null);
-                toast.error(err?.error || "Failed to convert to invoice");
+                toast.error(apiErrorMessage(err, "Failed to convert to invoice"));
             }
         } catch {
             toast.error("Network error — could not convert to invoice");
@@ -125,7 +126,7 @@ export default function QuotationViewPage({ params }: { params: Promise<{ id: st
                 router.push(`/billing/quotations/${data.id}`);
             } else {
                 const err = await res.json().catch(() => null);
-                toast.error(err?.error || "Failed to duplicate quotation");
+                toast.error(apiErrorMessage(err, "Failed to duplicate quotation"));
             }
         } catch {
             toast.error("Network error — could not duplicate quotation");
@@ -145,7 +146,7 @@ export default function QuotationViewPage({ params }: { params: Promise<{ id: st
                 router.push("/billing");
             } else {
                 const err = await res.json().catch(() => null);
-                toast.error(err?.error || "Failed to delete quotation.");
+                toast.error(apiErrorMessage(err, "Failed to delete quotation."));
             }
         } catch {
             toast.error("Failed to delete quotation.");

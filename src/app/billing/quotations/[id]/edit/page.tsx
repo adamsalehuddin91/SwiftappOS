@@ -11,6 +11,7 @@ import { ArrowLeft, Trash2, Plus, FileText, User, Loader2, Save, Phone } from "l
 import Link from "next/link";
 import { Quotation } from "@/types";
 import { toast } from "sonner";
+import { apiErrorMessage } from "@/lib/api-error";
 
 interface EditableItem {
     id: number;
@@ -113,7 +114,7 @@ export default function EditQuotationPage({ params }: { params: Promise<{ id: st
                 router.push(`/billing/quotations/${id}`);
             } else {
                 const err = await res.json().catch(() => null);
-                toast.error(err?.error || "Failed to update quotation");
+                toast.error(apiErrorMessage(err, "Failed to update quotation"));
             }
         } catch {
             toast.error("Network error — could not save changes");

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ArrowLeft, Loader2, Save, Zap } from "lucide-react";
 import Link from "next/link";
+import { apiErrorMessage } from "@/lib/api-error";
 
 export default function NewMilestonePage({
     params,
@@ -144,7 +145,7 @@ export default function NewMilestonePage({
 
             if (!res.ok) {
                 const data = await res.json();
-                throw new Error(data.error || "Failed to create milestone");
+                throw new Error(apiErrorMessage(data, "Failed to create milestone"));
             }
 
             router.push(`/projects/${projectId}`);

@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { PdfDocument } from "@/lib/pdf-generator";
 import { INVOICE_TC } from "@/lib/billing-presets";
+import { apiErrorMessage } from "@/lib/api-error";
 import { Invoice, Receipt } from "@/types";
 
 const PDFDownloadLink = dynamic(
@@ -96,7 +97,7 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
         toast.success(`Invoice marked as ${newStatus}`);
       } else {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || `Failed to update status`);
+        toast.error(apiErrorMessage(err, `Failed to update status`));
       }
     } catch {
       toast.error("Failed to update invoice status");
@@ -127,7 +128,7 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
         toast.success("Payment recorded successfully");
       } else {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Failed to record payment");
+        toast.error(apiErrorMessage(err, "Failed to record payment"));
       }
     } catch {
       toast.error("Failed to record payment");
@@ -150,7 +151,7 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
         router.push("/billing");
       } else {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Failed to delete invoice.");
+        toast.error(apiErrorMessage(err, "Failed to delete invoice."));
       }
     } catch {
       toast.error("Failed to delete invoice.");

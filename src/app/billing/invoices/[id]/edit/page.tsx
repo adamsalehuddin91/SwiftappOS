@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Trash2, Plus, FileText, User, Loader2, Save, Receipt, FolderOpen } from "lucide-react";
 import Link from "next/link";
 import { Invoice, InvoiceType } from "@/types";
+import { apiErrorMessage } from "@/lib/api-error";
 import { toast } from "sonner";
 
 interface EditableItem {
@@ -142,7 +143,7 @@ export default function EditInvoicePage({ params }: { params: Promise<{ id: stri
                 router.push(`/billing/invoices/${id}`);
             } else {
                 const err = await res.json().catch(() => null);
-                toast.error(err?.error || "Failed to update invoice");
+                toast.error(apiErrorMessage(err, "Failed to update invoice"));
             }
         } catch {
             toast.error("Network error — could not save changes");
@@ -343,7 +344,7 @@ export default function EditInvoicePage({ params }: { params: Promise<{ id: stri
                                             type="number"
                                             value={item.unitPrice}
                                             onChange={(e) => updateItem(item.id, "unitPrice", Number(e.target.value))}
-                                            min={0}
+                                            step="0.01"
                                             className="bg-secondary/20 border-border/50 h-9"
                                         />
                                     </div>

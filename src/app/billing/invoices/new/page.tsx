@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { PdfDocument } from "@/lib/pdf-generator";
 import { INVOICE_TC, QUOTATION_PRESETS } from "@/lib/billing-presets";
+import { apiErrorMessage } from "@/lib/api-error";
 
 const PDFDownloadLink = dynamic(
   () => import("@react-pdf/renderer").then((mod) => mod.PDFDownloadLink),
@@ -184,7 +185,7 @@ function NewInvoicePageInner() {
         router.push(`/billing/invoices/${created.id}`);
       } else {
         const err = await res.json().catch(() => ({}));
-        toast.error(typeof err.error === "string" ? err.error : "Failed to create invoice");
+        toast.error(apiErrorMessage(err, "Failed to create invoice"));
       }
     } catch {
       toast.error("Failed to create invoice. Please try again.");
@@ -222,7 +223,7 @@ function NewInvoicePageInner() {
         router.push(`/billing/invoices/${created.id}`);
       } else {
         const err = await res.json().catch(() => ({}));
-        toast.error(typeof err.error === "string" ? err.error : "Failed to create invoice");
+        toast.error(apiErrorMessage(err, "Failed to create invoice"));
       }
     } catch {
       toast.error("Failed to create invoice. Please try again.");
@@ -448,7 +449,7 @@ function NewInvoicePageInner() {
                     <div key={idx} className="grid grid-cols-1 md:grid-cols-[1fr_80px_120px_40px] gap-2 items-start">
                       <textarea className={`${inputCls} h-10 py-2 min-h-10`} value={it.description} onChange={(e) => { updateItem(idx, { description: e.target.value }); setSaved(false); }} placeholder="Deskripsi item" />
                       <input type="number" min={1} className={inputCls} value={it.quantity} onChange={(e) => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })} />
-                      <input type="number" min={0} step="0.01" className={inputCls} value={it.unitPrice} onChange={(e) => { updateItem(idx, { unitPrice: parseFloat(e.target.value) || 0 }); setSaved(false); }} />
+                      <input type="number" step="0.01" className={inputCls} value={it.unitPrice} onChange={(e) => { updateItem(idx, { unitPrice: parseFloat(e.target.value) || 0 }); setSaved(false); }} />
                       <button type="button" onClick={() => removeItem(idx)} disabled={manualItems.length === 1} className="h-10 flex items-center justify-center text-muted-foreground hover:text-destructive disabled:opacity-30">
                         <Trash2 className="h-4 w-4" />
                       </button>

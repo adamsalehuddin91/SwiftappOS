@@ -52,6 +52,14 @@ export const updateMilestoneSchema = z.object({
 
 // ── Invoices ───────────────────────────────────────────
 
+const invoiceItemSchema = z.object({
+  description: z.string().min(1),
+  quantity: z.number().positive(),
+  // Allow negative unit price for deduction/discount line items
+  // (e.g. "Deposit diterima" -750, "Diserap — tidak dicaj" -3000).
+  unitPrice: z.number(),
+});
+
 export const createInvoiceSchema = z.object({
   projectId: z.string().uuid("Invalid project ID").optional().nullable(),
   milestoneId: z.string().uuid().optional().nullable(),
@@ -61,11 +69,7 @@ export const createInvoiceSchema = z.object({
   type: InvoiceTypeEnum,
   amount: z.coerce.number().positive("Amount must be greater than 0"),
   dueDate: z.string().optional().nullable(),
-  items: z.array(z.object({
-    description: z.string().min(1),
-    quantity: z.number().positive(),
-    unitPrice: z.number().min(0),
-  })).optional(),
+  items: z.array(invoiceItemSchema).optional(),
   clientName: z.string().max(200).optional().nullable(),
   clientEmail: z.string().email().optional().nullable().or(z.literal("")),
   clientBrn: z.string().max(50).optional().nullable(),
@@ -77,11 +81,7 @@ export const updateInvoiceSchema = z.object({
   type: InvoiceTypeEnum.optional(),
   amount: z.coerce.number().positive().optional(),
   dueDate: z.string().optional().nullable(),
-  items: z.array(z.object({
-    description: z.string().min(1),
-    quantity: z.number().positive(),
-    unitPrice: z.number().min(0),
-  })).optional(),
+  items: z.array(invoiceItemSchema).optional(),
   clientName: z.string().max(200).optional().nullable(),
   clientEmail: z.string().email().optional().nullable().or(z.literal("")),
   clientBrn: z.string().max(50).optional().nullable(),

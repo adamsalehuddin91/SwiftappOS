@@ -69,6 +69,8 @@ numbers printed on them.
 
 | Method | Path | Purpose |
 |---|---|---|
+| `GET` | `/api/agent/status` | Counts and totals only — no names, no ids |
+| `GET` | `/api/audit` | Recent writes: actor, action, before/after |
 | `GET` | `/api/dashboard` | Overdue invoices, pending milestones |
 | `GET` | `/api/analytics` | Cashflow — collected, pending, monthly |
 | `GET` | `/api/billing/stats` | Billing summary |
@@ -87,6 +89,31 @@ numbers printed on them.
 
 The allowlist lives in `src/lib/agent-auth.ts`. Add a route there and here, or it
 stays shut.
+
+### Two further limits, applied inside the routes
+
+**Writes are status-only.** `PUT /api/projects/{id}` and `PUT /api/milestones/{id}`
+take a whole record, so without this the agent could rewrite a milestone's amount —
+RM1,000 into RM100 — while nominally updating a status. Any field other than
+`status` is refused with `403`. The browser is unaffected.
+
+**Responses are redacted.** `client_email`, `client_phone`, `client_brn`,
+`sow_details`, `notes` and `description` are stripped from everything the agent
+reads, nested shapes included. Its flows need names, amounts and dates; none of
+them need a way to contact a client. A leaked token cannot become a contact list.
+Widen the list in `src/lib/agent-guard.ts` only when a real flow needs a field.
+
+### Every write is logged
+
+`audit_log` records entity, action, actor (`agent` or `browser`), and before/after
+snapshots. `projects`, `invoices` and `receipts` also carry `created_by`, so "where
+did this invoice come from?" has an answer without a log lookup. Payments log inside
+the same transaction as the money; everything else logs best-effort after the write,
+and never fails the operation it describes.
+
+Attach `X-Agent-Source: <text>` to a write and it lands in the log's `source`
+column. It is self-reported, so it is context for a human reading the log — never
+a control.
 
 ---
 
@@ -116,6 +143,16 @@ key per retry defeats the whole thing.
 Beyond the key, the payment route takes a `SELECT … FOR UPDATE` on the invoice row,
 so two payments that arrive together are serialised rather than both reading a
 stale paid-to-date total.
+
+`POST /api/projects` and `POST /api/invoices` accept the same header.
+
+Invoice creation additionally refuses a near-duplicate: same project, type and
+amount within ten minutes answers `409` naming the existing invoice, because
+invoice numbers are sequential and permanent and a phantom one leaves a debt on the
+client's account. Send `{"allowDuplicate": true}` when a second is genuinely
+intended. The check runs *inside* the idempotency wrapper — a keyed retry is the
+one duplicate that is legitimate, and checking first would refuse the very case the
+key exists to make safe.
 
 ---
 

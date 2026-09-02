@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getNextNumber } from "@/lib/sequences";
 import { idempotencyKeyFrom, withIdempotency } from "@/lib/idempotency";
+import { callerLabel, sanitizeForCaller } from "@/lib/agent-guard";
+import { recordAudit } from "@/lib/audit";
 import { z } from "zod";
 
 const recordPaymentSchema = z.object({
@@ -26,7 +28,7 @@ export async function GET(
       where: { invoiceId: id },
       orderBy: { createdAt: "desc" },
     });
-    return NextResponse.json(receipts);
+    return NextResponse.json(sanitizeForCaller(_request, receipts));
   } catch {
     return NextResponse.json({ error: "Failed to fetch receipts" }, { status: 500 });
   }
@@ -115,6 +117,7 @@ export async function POST(
                 amountPaid: amount,
                 paymentMethod: paymentMethod ?? null,
                 paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
+                createdBy: callerLabel(request),
               },
             });
 
@@ -156,6 +159,30 @@ export async function POST(
                 });
               }
             }
+
+            // Logged inside the same transaction as the payment: an audit row
+            // that can go missing while the money lands is the one case where
+            // best-effort logging is not good enough.
+            await recordAudit({
+              request,
+              tx,
+              entity: "receipt",
+              entityId: receipt.id,
+              action: "payment",
+              before: {
+                invoiceNumber: invoice.invoiceNumber,
+                status: invoice.status,
+                totalPaid: totalAlreadyPaid,
+              },
+              after: {
+                invoiceNumber: invoice.invoiceNumber,
+                status,
+                totalPaid,
+                receiptNumber: receipt.receiptNumber,
+                amountPaid: amount,
+                milestonesMarkedPaid,
+              },
+            });
 
             return {
               status: 201 as const,

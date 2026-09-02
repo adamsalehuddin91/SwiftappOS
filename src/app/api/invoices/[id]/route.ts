@@ -3,6 +3,8 @@ import prisma from "@/lib/prisma";
 import { mapInvoice } from "@/lib/mappers";
 import { updateInvoiceSchema, updateInvoiceStatusSchema } from "@/lib/validations";
 import { validateTransition } from "@/lib/status-workflows";
+import { sanitizeForCaller } from "@/lib/agent-guard";
+import { recordAudit } from "@/lib/audit";
 
 export async function GET(
   request: NextRequest,
@@ -19,10 +21,12 @@ export async function GET(
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
-    return NextResponse.json({
-      ...mapInvoice(invoice),
-      receipts: invoice.receipts,
-    });
+    return NextResponse.json(
+      sanitizeForCaller(request, {
+        ...mapInvoice(invoice),
+        receipts: invoice.receipts,
+      })
+    );
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to fetch invoice" },
@@ -133,6 +137,15 @@ export async function PATCH(
       where: { id },
       data: { status: parsed.data.status },
       include: { project: true },
+    });
+
+    await recordAudit({
+      request,
+      entity: "invoice",
+      entityId: id,
+      action: "status",
+      before: { status: existing.status },
+      after: { status: invoice.status },
     });
 
     return NextResponse.json(mapInvoice(invoice));

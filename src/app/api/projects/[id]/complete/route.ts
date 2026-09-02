@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { buildDeliveryChecklist } from "@/lib/delivery-checklist";
 import { completeProjectSchema } from "@/lib/validations";
+import { recordAudit } from "@/lib/audit";
 
 /**
  * Close a project and freeze its handover checklist.
@@ -114,6 +115,20 @@ export async function POST(
         status: "Completed",
         completedAt: new Date(),
         deliveryChecklist: stored as never,
+      },
+    });
+
+    await recordAudit({
+      request,
+      entity: "project",
+      entityId: updated.id,
+      action: "complete",
+      before: { status: project.status, completedAt: null },
+      after: {
+        status: updated.status,
+        completedAt: updated.completedAt,
+        completedWithBlockers: stored.completedWithBlockers,
+        blockers: checklist.blockers,
       },
     });
 

@@ -4,6 +4,9 @@ import { mapInvoice } from "@/lib/mappers";
 import { createInvoiceSchema, paginationSchema } from "@/lib/validations";
 import { getNextNumber } from "@/lib/sequences";
 import { getPaginationParams, buildPaginatedResponse } from "@/lib/pagination";
+import { callerLabel, sanitizeForCaller } from "@/lib/agent-guard";
+import { recordAudit } from "@/lib/audit";
+import { idempotencyKeyFrom, withIdempotency } from "@/lib/idempotency";
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,7 +39,10 @@ export async function GET(request: NextRequest) {
     ]);
 
     return NextResponse.json(
-      buildPaginatedResponse(invoices.map(mapInvoice), total, params.page, params.limit)
+      sanitizeForCaller(
+        request,
+        buildPaginatedResponse(invoices.map(mapInvoice), total, params.page, params.limit)
+      )
     );
   } catch (error) {
     return NextResponse.json(
@@ -61,6 +67,46 @@ export async function POST(request: NextRequest) {
     const linkMilestoneId =
       data.milestoneId ?? (data.milestoneIds?.length === 1 ? data.milestoneIds[0] : null);
 
+    return await withIdempotency(
+      idempotencyKeyFrom(request),
+      "POST /api/invoices",
+      parsed.data,
+      async () => {
+        // Runs INSIDE the idempotency wrapper, not before it. A keyed retry is
+        // the one duplicate that is legitimate — checking for near-duplicates
+        // first would answer 409 to the very case the key exists to make safe.
+        //
+        // A second invoice for the same project, type and amount minutes after the
+        // first is almost always a retry or a double click, not a real document.
+        // Invoice numbers are sequential and permanent, so a duplicate burns one and
+        // leaves a phantom debt on the client's account.
+        if (!data.allowDuplicate) {
+          const recent = await prisma.invoice.findFirst({
+            where: {
+              projectId: data.projectId ?? null,
+              type: data.type,
+              amount: data.amount,
+              status: { not: "Void" },
+              createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) },
+            },
+            orderBy: { createdAt: "desc" },
+          });
+
+          if (recent) {
+            return {
+              status: 409,
+              body: {
+                error: `An identical invoice (${recent.invoiceNumber}) was raised ${Math.round(
+                  (Date.now() - recent.createdAt.getTime()) / 1000
+                )}s ago.`,
+                existingInvoiceId: recent.id,
+                existingInvoiceNumber: recent.invoiceNumber,
+                hint: 'Send { "allowDuplicate": true } if a second one is genuinely intended.',
+              },
+            };
+          }
+        }
+
     // One transaction: an invoice must never exist with its milestones left
     // unmarked, and the invoice number must not be burned if the sync fails.
     const invoice = await prisma.$transaction(async (tx) => {
@@ -79,6 +125,7 @@ export async function POST(request: NextRequest) {
           clientEmail: data.clientEmail || null,
           clientBrn: data.clientBrn ?? null,
           notes: data.notes ?? null,
+          createdBy: callerLabel(request),
         },
         include: { project: true },
       });
@@ -101,7 +148,17 @@ export async function POST(request: NextRequest) {
       return created;
     });
 
-    return NextResponse.json(mapInvoice(invoice), { status: 201 });
+        await recordAudit({
+          request,
+          entity: "invoice",
+          entityId: invoice.id,
+          action: "create",
+          after: mapInvoice(invoice),
+        });
+
+        return { status: 201, body: sanitizeForCaller(request, mapInvoice(invoice)) };
+      }
+    );
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to create invoice" },

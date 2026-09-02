@@ -4,6 +4,8 @@ import { mapMilestone } from "@/lib/mappers";
 import { MilestoneStatus } from "@/generated/prisma/client";
 import { updateMilestoneSchema } from "@/lib/validations";
 import { validateTransition } from "@/lib/status-workflows";
+import { rejectDisallowedFields, sanitizeForCaller } from "@/lib/agent-guard";
+import { recordAudit } from "@/lib/audit";
 
 const statusToPrisma: Record<string, MilestoneStatus> = {
   Pending: "Pending",
@@ -20,6 +22,12 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
+
+    // Without this the agent could rewrite `amount` while nominally updating a
+    // status — turning RM1,000 into RM100 with one call.
+    const refused = rejectDisallowedFields(request, body, ["status"]);
+    if (refused) return refused;
+
     const parsed = updateMilestoneSchema.safeParse(body);
 
     if (!parsed.success) {
@@ -27,6 +35,7 @@ export async function PUT(
     }
 
     const data = parsed.data;
+    const before = await prisma.milestone.findUnique({ where: { id } });
 
     // Validate status transition if status is being changed
     if (data.status) {
@@ -59,7 +68,16 @@ export async function PUT(
       },
     });
 
-    return NextResponse.json(mapMilestone(milestone));
+    await recordAudit({
+      request,
+      entity: "milestone",
+      entityId: id,
+      action: data.status !== undefined ? "status" : "update",
+      before: before ? mapMilestone(before) : undefined,
+      after: mapMilestone(milestone),
+    });
+
+    return NextResponse.json(sanitizeForCaller(request, mapMilestone(milestone)));
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to update milestone" },

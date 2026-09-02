@@ -82,6 +82,9 @@ export const createInvoiceSchema = z.object({
   clientEmail: z.string().email().optional().nullable().or(z.literal("")),
   clientBrn: z.string().max(50).optional().nullable(),
   notes: z.string().max(5000).optional().nullable(),
+  // Opt out of the near-duplicate guard when a second identical invoice is
+  // genuinely intended (two identical monthly charges in the same window).
+  allowDuplicate: z.boolean().optional().default(false),
 });
 
 export const updateInvoiceSchema = z.object({

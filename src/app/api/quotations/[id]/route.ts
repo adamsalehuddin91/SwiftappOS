@@ -3,6 +3,8 @@ import prisma from "@/lib/prisma";
 import { mapQuotation } from "@/lib/mappers";
 import { updateQuotationSchema, updateQuotationStatusSchema } from "@/lib/validations";
 import { validateTransition } from "@/lib/status-workflows";
+import { sanitizeForCaller } from "@/lib/agent-guard";
+import { recordAudit } from "@/lib/audit";
 
 export async function GET(
   request: NextRequest,
@@ -18,7 +20,7 @@ export async function GET(
       return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
     }
 
-    return NextResponse.json(mapQuotation(quotation));
+    return NextResponse.json(sanitizeForCaller(request, mapQuotation(quotation)));
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to fetch quotation" },
@@ -129,7 +131,16 @@ export async function PATCH(
       data: { status: parsed.data.status },
     });
 
-    return NextResponse.json(mapQuotation(quotation));
+    await recordAudit({
+      request,
+      entity: "quotation",
+      entityId: id,
+      action: "status",
+      before: { status: existing.status },
+      after: { status: quotation.status },
+    });
+
+    return NextResponse.json(sanitizeForCaller(request, mapQuotation(quotation)));
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to update quotation status" },

@@ -17,6 +17,7 @@ export interface Project {
   client_email?: string;
   client_brn?: string;
   is_archived?: boolean;
+  created_by?: string;
   created_at: string;
   updated_at: string;
   progress?: number;
@@ -58,6 +59,7 @@ export interface Invoice {
   client_brn?: string;
   notes?: string;
   project_name?: string;
+  created_by?: string;
   created_at: string;
   updated_at?: string;
   receipts?: Receipt[];

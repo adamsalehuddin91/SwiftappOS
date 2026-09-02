@@ -239,6 +239,157 @@ console.log("\n== 7. SESSION COOKIE ==");
   ok("logout clears the cookie", /swiftapp-session=(;|"")/.test(out.headers.get("set-cookie") || ""), out.headers.get("set-cookie") || "");
 }
 
+console.log("\n== 9. AGENT GUARDS (P1–P5) ==");
+{
+  // A browser session, to prove every guard below applies to the agent only and
+  // does not quietly cripple the UI.
+  const loginRes = await fetch(`${BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password: PASSWORD }),
+    redirect: "manual",
+  });
+  const cookie = (loginRes.headers.get("set-cookie") || "").match(/swiftapp-session=([^;]*)/)?.[1];
+  const asBrowser = (path, init = {}) =>
+    fetch(BASE + path, {
+      ...init,
+      headers: { "Content-Type": "application/json", cookie: `swiftapp-session=${cookie}`, ...(init.headers || {}) },
+      redirect: "manual",
+    });
+
+  const proj = (await api("/api/projects", {
+    method: "POST",
+    body: JSON.stringify({
+      name: `AgentTest Guards ${Date.now()}`,
+      clientName: "Ujian Guard Sdn Bhd",
+      clientEmail: "rahsia@contoh.my",
+      sowDetails: "Skop sulit yang agent tak patut baca",
+      status: "Live",
+    }),
+  })).body;
+
+  // ── P1: agent may only move status ────────────────────────────────────
+  const m = (await api("/api/milestones", {
+    method: "POST",
+    body: JSON.stringify({ projectId: proj.id, name: "Guard milestone", amount: 1000 }),
+  })).body;
+
+  const amountAttack = await api(`/api/milestones/${m.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ status: "In Progress", amount: 1 }),
+  });
+  ok("P1 agent rewriting milestone amount -> 403", amountAttack.status === 403, `got ${amountAttack.status}`);
+
+  const statusOnly = await api(`/api/milestones/${m.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ status: "In Progress" }),
+  });
+  ok("P1 agent status-only update -> 200", statusOnly.status === 200, `got ${statusOnly.status}`);
+
+  const stillThousand = (await api(`/api/projects/${proj.id}`)).body.milestones.find((x) => x.id === m.id);
+  ok("P1 amount untouched by the refused call", stillThousand.amount === 1000, `got ${stillThousand.amount}`);
+
+  const projAttack = await api(`/api/projects/${proj.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ status: "Live", clientName: "Dirampas Sdn Bhd" }),
+  });
+  ok("P1 agent rewriting project client -> 403", projAttack.status === 403, `got ${projAttack.status}`);
+
+  const browserEdit = await asBrowser(`/api/milestones/${m.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ status: "Completed", amount: 1500 }),
+  });
+  ok("P1 browser may still edit amount (guard is agent-only)", browserEdit.status === 200, `got ${browserEdit.status}`);
+
+  // ── P4: redaction ─────────────────────────────────────────────────────
+  const agentView = (await api(`/api/projects/${proj.id}`)).body;
+  ok("P4 agent sees no client_email", agentView.client_email === undefined, JSON.stringify(agentView.client_email));
+  ok("P4 agent sees no sow_details", agentView.sow_details === undefined);
+  ok("P4 agent still sees client_name", agentView.client_name === "Ujian Guard Sdn Bhd", agentView.client_name);
+
+  const browserView = await (await asBrowser(`/api/projects/${proj.id}`)).json();
+  ok("P4 browser still sees client_email", browserView.client_email === "rahsia@contoh.my", browserView.client_email);
+  ok("P4 browser still sees sow_details", typeof browserView.sow_details === "string");
+
+  const listView = (await api("/api/projects?limit=5")).body;
+  ok("P4 redaction applies to list responses too",
+    (listView.data ?? listView.items ?? []).every((p) => p.client_email === undefined),
+    JSON.stringify(Object.keys(listView)));
+
+  const status = await api("/api/agent/status");
+  ok("P4 /api/agent/status -> 200", status.status === 200, `got ${status.status}`);
+  ok("P4 status carries counts", typeof status.body?.projects?.total === "number", JSON.stringify(status.body).slice(0, 120));
+  ok("P4 status leaks no names or ids", !JSON.stringify(status.body).includes("Ujian Guard Sdn Bhd"));
+
+  // ── P3: idempotency on creates ────────────────────────────────────────
+  const pk = `proj-key-${Date.now()}`;
+  const p1 = await api("/api/projects", {
+    method: "POST", headers: { "X-Idempotency-Key": pk },
+    body: JSON.stringify({ name: `AgentTest Idem ${Date.now()}` }),
+  });
+  const p2 = await api("/api/projects", {
+    method: "POST", headers: { "X-Idempotency-Key": pk },
+    body: JSON.stringify({ name: p1.body.name }),
+  });
+  ok("P3 repeated project create replays same id", p1.body.id === p2.body.id, `${p1.body.id} vs ${p2.body.id}`);
+
+  const ik = `inv-key-${Date.now()}`;
+  const i1 = await api("/api/invoices", {
+    method: "POST", headers: { "X-Idempotency-Key": ik },
+    body: JSON.stringify({ projectId: proj.id, type: "Deposit", amount: 777 }),
+  });
+  const i2 = await api("/api/invoices", {
+    method: "POST", headers: { "X-Idempotency-Key": ik },
+    body: JSON.stringify({ projectId: proj.id, type: "Deposit", amount: 777 }),
+  });
+  ok("P3 repeated invoice create replays same number",
+    i1.body.invoice_number === i2.body.invoice_number, `${i1.body.invoice_number} vs ${i2.body.invoice_number}`);
+
+  // ── P5: near-duplicate invoice guard ──────────────────────────────────
+  const dup = await api("/api/invoices", {
+    method: "POST",
+    body: JSON.stringify({ projectId: proj.id, type: "Deposit", amount: 777 }),
+  });
+  ok("P5 identical invoice minutes later -> 409", dup.status === 409, `got ${dup.status}`);
+  ok("P5 409 names the existing invoice", dup.body?.existingInvoiceNumber === i1.body.invoice_number, JSON.stringify(dup.body));
+
+  const forced = await api("/api/invoices", {
+    method: "POST",
+    body: JSON.stringify({ projectId: proj.id, type: "Deposit", amount: 777, allowDuplicate: true }),
+  });
+  ok("P5 allowDuplicate lets a genuine second one through", forced.status === 201, `got ${forced.status}`);
+
+  // ── P2: audit log ─────────────────────────────────────────────────────
+  ok("P2 created_by recorded on the project", p1.body.created_by === "agent", p1.body.created_by);
+  ok("P2 created_by recorded on the invoice", i1.body.created_by === "agent", i1.body.created_by);
+
+  const pay = await api(`/api/invoices/${i1.body.id}/receipts`, {
+    method: "POST",
+    body: JSON.stringify({ amount: 777, paymentMethod: "transfer" }),
+  });
+  ok("P2 payment recorded", pay.status === 201, `got ${pay.status}`);
+
+  const audit = (await api("/api/audit?limit=50")).body;
+  ok("P2 /api/audit -> entries", Array.isArray(audit?.entries) && audit.entries.length > 0, JSON.stringify(audit).slice(0, 120));
+
+  const actions = audit.entries.map((e) => `${e.entity}:${e.action}`);
+  ok("P2 project create logged", actions.includes("project:create"), actions.slice(0, 8).join(","));
+  ok("P2 invoice create logged", actions.includes("invoice:create"));
+  ok("P2 payment logged", actions.includes("receipt:payment"));
+  ok("P2 milestone status change logged", actions.includes("milestone:status") || actions.includes("milestone:update"));
+  ok("P2 every entry names an actor", audit.entries.every((e) => e.actor === "agent" || e.actor === "browser"));
+
+  const payEntry = audit.entries.find((e) => e.entity === "receipt" && e.action === "payment");
+  ok("P2 payment entry carries before/after", !!payEntry?.before && !!payEntry?.after, JSON.stringify(payEntry ?? {}).slice(0, 150));
+  ok("P2 payment entry attributed to the agent", payEntry?.actor === "agent", payEntry?.actor);
+
+  const browserEntry = audit.entries.find((e) => e.actor === "browser");
+  ok("P2 browser writes distinguished from agent writes", !!browserEntry, "the browser milestone edit above should appear");
+
+  const filtered = (await api("/api/audit?limit=50&actor=agent")).body;
+  ok("P2 audit filters by actor", filtered.entries.every((e) => e.actor === "agent"));
+}
+
 console.log("\n== 8. LOGIN RATE LIMIT ==");
 {
   // This section burns the login budget for this address, so it runs last and

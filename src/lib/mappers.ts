@@ -25,6 +25,7 @@ export function mapProject(p: PrismaProject): Project {
     client_email: p.clientEmail ?? undefined,
     client_brn: p.clientBrn ?? undefined,
     is_archived: p.isArchived,
+    created_by: p.createdBy ?? undefined,
     created_at: p.createdAt.toISOString(),
     updated_at: p.updatedAt.toISOString(),
   };
@@ -57,6 +58,7 @@ export function mapInvoice(
     due_date: inv.dueDate ? inv.dueDate.toISOString().split("T")[0] : undefined,
     items: (inv.items as unknown) as QuotationItem[] | undefined,
     client_name: inv.clientName ?? undefined,
+    created_by: inv.createdBy ?? undefined,
     client_email: inv.clientEmail ?? undefined,
     client_brn: inv.clientBrn ?? undefined,
     notes: inv.notes ?? undefined,

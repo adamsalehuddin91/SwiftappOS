@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { mapMilestone } from "@/lib/mappers";
 import { createMilestoneSchema } from "@/lib/validations";
+import { sanitizeForCaller } from "@/lib/agent-guard";
+import { recordAudit } from "@/lib/audit";
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,7 +26,15 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(mapMilestone(milestone), { status: 201 });
+    await recordAudit({
+      request,
+      entity: "milestone",
+      entityId: milestone.id,
+      action: "create",
+      after: mapMilestone(milestone),
+    });
+
+    return NextResponse.json(sanitizeForCaller(request, mapMilestone(milestone)), { status: 201 });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to create milestone" },

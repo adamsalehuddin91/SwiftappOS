@@ -65,6 +65,8 @@ model Project {
   clientEmail String?       @map("client_email")
   clientBrn   String?       @map("client_brn")
   isArchived  Boolean       @default(false) @map("is_archived")
+  /// "agent" or "browser" — answers "who made this?" without a log lookup.
+  createdBy   String?       @map("created_by")
   completedAt DateTime?     @map("completed_at") @db.Timestamptz
   // Snapshot of the handover checklist generated when the project was completed.
   // Stored (not derived on read) so the list the client was handed stays fixed.
@@ -140,6 +142,7 @@ model Invoice {
   clientEmail   String?       @map("client_email")
   clientBrn     String?       @map("client_brn")
   notes         String?
+  createdBy     String?       @map("created_by")
   createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -158,6 +161,7 @@ model Receipt {
   amountPaid    Decimal  @map("amount_paid") @db.Decimal(10, 2)
   paymentMethod String?  @map("payment_method")
   paymentDate   DateTime @default(now()) @map("payment_date") @db.Date
+  createdBy     String?  @map("created_by")
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -253,4 +257,29 @@ model LoginAttempt {
 
   @@index([ipHash, createdAt])
   @@map("login_attempts")
+}
+
+/// Every write that reaches a project, milestone, quotation, invoice or receipt.
+///
+/// Exists so the question "where did this invoice come from?" has an answer that
+/// does not depend on remembering. It is also the only forensics available if a
+/// machine token is ever misused: `actor` separates the agent from the browser,
+/// and before/after make the change itself legible.
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  entity    String
+  entityId  String   @map("entity_id")
+  action    String
+  /// "agent" | "browser"
+  actor     String
+  /// Free text the caller may supply (X-Agent-Source). Self-reported, so it is
+  /// context for a human reading the log — never a control.
+  source    String?
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([entity, entityId, createdAt])
+  @@index([actor, createdAt])
+  @@map("audit_log")
 }

@@ -4,6 +4,7 @@ import { mapQuotation } from "@/lib/mappers";
 import { createQuotationSchema, paginationSchema } from "@/lib/validations";
 import { getNextNumber } from "@/lib/sequences";
 import { getPaginationParams, buildPaginatedResponse } from "@/lib/pagination";
+import { sanitizeForCaller } from "@/lib/agent-guard";
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,7 +36,10 @@ export async function GET(request: NextRequest) {
     ]);
 
     return NextResponse.json(
-      buildPaginatedResponse(quotations.map(mapQuotation), total, params.page, params.limit)
+      sanitizeForCaller(
+        request,
+        buildPaginatedResponse(quotations.map(mapQuotation), total, params.page, params.limit)
+      )
     );
   } catch (error) {
     return NextResponse.json(

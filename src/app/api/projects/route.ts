@@ -3,6 +3,9 @@ import prisma from "@/lib/prisma";
 import { mapProject } from "@/lib/mappers";
 import { createProjectSchema, paginationSchema } from "@/lib/validations";
 import { getPaginationParams, buildPaginatedResponse } from "@/lib/pagination";
+import { callerLabel, sanitizeForCaller } from "@/lib/agent-guard";
+import { recordAudit } from "@/lib/audit";
+import { idempotencyKeyFrom, withIdempotency } from "@/lib/idempotency";
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,7 +40,10 @@ export async function GET(request: NextRequest) {
     ]);
 
     return NextResponse.json(
-      buildPaginatedResponse(projects.map(mapProject), total, params.page, params.limit)
+      sanitizeForCaller(
+        request,
+        buildPaginatedResponse(projects.map(mapProject), total, params.page, params.limit)
+      )
     );
   } catch (error) {
     return NextResponse.json(
@@ -58,18 +64,34 @@ export async function POST(request: NextRequest) {
 
     const { name, description, status, sowDetails, clientName, clientEmail } = parsed.data;
 
-    const project = await prisma.project.create({
-      data: {
-        name,
-        description: description ?? null,
-        status: status ?? "Drafting",
-        sowDetails: sowDetails ?? null,
-        clientName: clientName ?? null,
-        clientEmail: clientEmail || null,
-      },
-    });
+    return await withIdempotency(
+      idempotencyKeyFrom(request),
+      "POST /api/projects",
+      parsed.data,
+      async () => {
+        const project = await prisma.project.create({
+          data: {
+            name,
+            description: description ?? null,
+            status: status ?? "Drafting",
+            sowDetails: sowDetails ?? null,
+            clientName: clientName ?? null,
+            clientEmail: clientEmail || null,
+            createdBy: callerLabel(request),
+          },
+        });
 
-    return NextResponse.json(mapProject(project), { status: 201 });
+        await recordAudit({
+          request,
+          entity: "project",
+          entityId: project.id,
+          action: "create",
+          after: mapProject(project),
+        });
+
+        return { status: 201, body: sanitizeForCaller(request, mapProject(project)) };
+      }
+    );
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to create project" },

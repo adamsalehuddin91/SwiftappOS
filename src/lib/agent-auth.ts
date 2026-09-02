@@ -23,6 +23,8 @@ const UUID = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-
  *     the workflow, it does not rewrite the numbers on a document.
  */
 const AGENT_ROUTES: ReadonlyArray<{ method: string; pattern: RegExp }> = [
+  { method: "GET", pattern: new RegExp(`^/api/agent/status$`) },
+  { method: "GET", pattern: new RegExp(`^/api/audit$`) },
   { method: "GET", pattern: new RegExp(`^/api/dashboard$`) },
   { method: "GET", pattern: new RegExp(`^/api/analytics$`) },
   { method: "GET", pattern: new RegExp(`^/api/billing/stats$`) },

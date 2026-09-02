@@ -25,7 +25,7 @@ openssl rand -hex 32
 That one string goes in **two places, identical**:
 
 ```
-Coolify env                        VPS /root/.hermes/swiftos.env
+Coolify env                        VPS /root/.hermes/.env
 AGENT_API_TOKEN=9f3c1e7a...   ==   SWIFTOS_AGENT_TOKEN=9f3c1e7a...
 ```
 
@@ -38,7 +38,7 @@ is unaffected. That is a safe state to deploy in.
 
 ### Rotating it
 
-Change it in Coolify, redeploy, then update `swiftos.env` on the VPS. Between
+Change it in Coolify, redeploy, then update `/root/.hermes/.env` on the VPS. Between
 those two steps the agent gets `401`; nothing is lost, its calls just fail
 loudly. Do it in that order rather than the reverse, so there is never a window
 where an old token still works.

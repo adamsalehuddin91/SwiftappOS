@@ -4,6 +4,7 @@
 //   SWIFTOS_BASE_URL=http://localhost:3000 AGENT_API_TOKEN=<token> npm run test:agent
 const BASE = process.env.SWIFTOS_BASE_URL || "http://localhost:3000";
 const TOKEN = process.env.AGENT_API_TOKEN || "local-test-agent-token-0123456789abcdef";
+const PASSWORD = process.env.SWIFTAPP_PASSWORD || "test-pw-local-only";
 const H = { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` };
 
 let pass = 0, fail = 0;
@@ -157,6 +158,84 @@ console.log("\n== 6. PROJECT COMPLETION ==");
 
   const dueAfter = (await api("/api/milestones/due?days=3")).body;
   ok("completed project drops out of reminders", !dueAfter.milestones.some((m) => m.projectId === proj.id), JSON.stringify(dueAfter.counts));
+}
+
+console.log("\n== 7. SESSION COOKIE ==");
+{
+  const { webcrypto } = await import("node:crypto");
+  const subtle = webcrypto.subtle;
+  const enc = new TextEncoder();
+
+  const login = (pw) =>
+    fetch(`${BASE}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: pw }),
+      redirect: "manual",
+    });
+
+  const cookieFrom = (res) => {
+    const raw = res.headers.get("set-cookie") || "";
+    const m = raw.match(/swiftapp-session=([^;]*)/);
+    return { value: m ? m[1] : null, raw };
+  };
+
+  const withCookie = (value) =>
+    fetch(`${BASE}/api/projects`, {
+      headers: { cookie: `swiftapp-session=${value}` },
+      redirect: "manual",
+    });
+
+  const bad = await login("definitely-not-the-password");
+  ok("wrong password -> 401", bad.status === 401, `got ${bad.status}`);
+
+  const good = await login(PASSWORD);
+  const c1 = cookieFrom(good);
+  ok("correct password -> 200", good.status === 200, `got ${good.status}`);
+  ok("cookie is a v2 signed token", (c1.value || "").startsWith("v2."), String(c1.value).slice(0, 12));
+  ok("cookie is HttpOnly", /HttpOnly/i.test(c1.raw));
+  ok("cookie is SameSite=Lax", /SameSite=Lax/i.test(c1.raw));
+
+  const c2 = cookieFrom(await login(PASSWORD));
+  ok("two logins mint DIFFERENT tokens", c1.value !== c2.value, "old scheme returned one fixed value");
+
+  ok("valid session -> 200", (await withCookie(c1.value)).status === 200);
+  ok("second session also valid", (await withCookie(c2.value)).status === 200);
+
+  // The old static token: SHA256(password + "-swiftapp-session").
+  const legacyBuf = await subtle.digest("SHA-256", enc.encode(PASSWORD + "-swiftapp-session"));
+  const legacy = Array.from(new Uint8Array(legacyBuf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  ok("legacy static token REJECTED", (await withCookie(legacy)).status === 401, "the permanent key must be dead");
+
+  // Flip the last character of the signature.
+  const parts = c1.value.split(".");
+  const lastChar = parts[2].slice(-1);
+  const flipped = `${parts[0]}.${parts[1]}.${parts[2].slice(0, -1)}${lastChar === "A" ? "B" : "A"}`;
+  ok("tampered signature rejected", (await withCookie(flipped)).status === 401);
+
+  // Re-sign a payload whose expiry is in the past. Proves expiry is enforced,
+  // not merely present in the payload.
+  const b64url = (str) => Buffer.from(str, "utf8").toString("base64url");
+  const keyMaterial = await subtle.digest("SHA-256", enc.encode(`${PASSWORD}|swiftapp-session-key|v2`));
+  const key = await subtle.importKey("raw", keyMaterial, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const now = Math.floor(Date.now() / 1000);
+
+  const stale = b64url(JSON.stringify({ v: 2, iat: now - 7200, exp: now - 60, n: "deadbeefdeadbeefdeadbeef" }));
+  const staleSig = Buffer.from(await subtle.sign("HMAC", key, enc.encode(`v2.${stale}`))).toString("base64url");
+  ok("correctly signed but EXPIRED token rejected", (await withCookie(`v2.${stale}.${staleSig}`)).status === 401);
+
+  // Same construction, still in date -> accepted. Confirms the test above
+  // failed on expiry rather than on a signature this script computed wrongly.
+  const live = b64url(JSON.stringify({ v: 2, iat: now, exp: now + 600, n: "cafebabecafebabecafebabe" }));
+  const liveSig = Buffer.from(await subtle.sign("HMAC", key, enc.encode(`v2.${live}`))).toString("base64url");
+  ok("same construction, unexpired -> accepted", (await withCookie(`v2.${live}.${liveSig}`)).status === 200);
+
+  ok("garbage cookie rejected", (await withCookie("not-a-token")).status === 401);
+  ok("empty cookie rejected", (await withCookie("")).status === 401);
+
+  const out = await fetch(`${BASE}/api/auth/logout`, { method: "POST", redirect: "manual" });
+  ok("logout -> 200", out.status === 200, `got ${out.status}`);
+  ok("logout clears the cookie", /swiftapp-session=(;|"")/.test(out.headers.get("set-cookie") || ""), out.headers.get("set-cookie") || "");
 }
 
 console.log(`\n==== ${pass} passed, ${fail} failed ====`);

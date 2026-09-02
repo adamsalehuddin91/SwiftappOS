@@ -20,6 +20,12 @@ Two ways in, and they do not overlap.
 | Browser | `swiftapp-session` cookie (from `/login`) | Everything |
 | Agent | `Authorization: Bearer $AGENT_API_TOKEN` | Only the routes listed below |
 
+The browser cookie is an HMAC-signed token carrying its own expiry: 30 days
+absolute, renewed while the browser is actually in use. Each login mints a
+distinct token. Sessions are stateless, so logout clears the browser's own copy;
+to end every outstanding session at once, rotate `SESSION_SECRET` (or
+`SWIFTAPP_PASSWORD`) and redeploy.
+
 ```bash
 curl -sS https://os.example.my/api/milestones/due?days=3 \
   -H "Authorization: Bearer $AGENT_API_TOKEN"

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { MIN_AGENT_TOKEN_LENGTH, isAgentRouteAllowed } from "@/lib/agent-auth";
+import { secretsMatch } from "@/lib/crypto-edge";
 import {
-  MIN_AGENT_TOKEN_LENGTH,
-  isAgentRouteAllowed,
-  secretsMatch,
-  sessionTokenFor,
-} from "@/lib/agent-auth";
-
-const SESSION_COOKIE = "swiftapp-session";
+  SESSION_COOKIE,
+  SESSION_RENEW_WITHIN_SECONDS,
+  issueSession,
+  sessionCookieOptions,
+  verifySession,
+} from "@/lib/session";
 
 function jsonError(status: number, error: string) {
   return NextResponse.json({ error }, { status });
@@ -74,11 +75,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next({ request: { headers } });
   }
 
-  // ── Browser caller: session cookie ───────────────────────────────────
-  const sessionToken = request.cookies.get(SESSION_COOKIE)?.value;
-  const expectedToken = await sessionTokenFor(password);
+  // ── Browser caller: signed, expiring session cookie ──────────────────
+  const session = await verifySession(
+    request.cookies.get(SESSION_COOKIE)?.value,
+    password
+  );
 
-  if (!sessionToken || !(await secretsMatch(sessionToken, expectedToken))) {
+  if (!session.valid) {
     // API callers get a JSON 401. They used to get a 307 to the HTML login page,
     // which curl and the agent both read as success — a failed write looked like
     // a completed one and nothing reached the database.
@@ -88,7 +91,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+
+  // Slide the expiry for a browser that is still in use, so a 30-day absolute
+  // lifetime does not mean being logged out every 30 days. An abandoned copy of
+  // the cookie stops renewing and dies on schedule.
+  if (session.secondsRemaining < SESSION_RENEW_WITHIN_SECONDS) {
+    const renewed = await issueSession(password);
+    response.cookies.set(
+      SESSION_COOKIE,
+      renewed.token,
+      sessionCookieOptions(renewed.maxAge)
+    );
+  }
+
+  return response;
 }
 
 export const config = {

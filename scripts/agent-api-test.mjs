@@ -1,0 +1,163 @@
+// Integration test for the agent API. Writes real rows — point it at a scratch
+// deployment, never at production.
+//
+//   SWIFTOS_BASE_URL=http://localhost:3000 AGENT_API_TOKEN=<token> npm run test:agent
+const BASE = process.env.SWIFTOS_BASE_URL || "http://localhost:3000";
+const TOKEN = process.env.AGENT_API_TOKEN || "local-test-agent-token-0123456789abcdef";
+const H = { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` };
+
+let pass = 0, fail = 0;
+const ok = (name, cond, extra = "") => {
+  if (cond) { pass++; console.log(`  PASS  ${name}`); }
+  else { fail++; console.log(`  FAIL  ${name} ${extra}`); }
+};
+
+const api = async (path, init = {}) => {
+  const res = await fetch(BASE + path, { ...init, headers: { ...H, ...(init.headers || {}) }, redirect: "manual" });
+  let body = null;
+  try { body = await res.json(); } catch { body = null; }
+  return { status: res.status, body, headers: res.headers };
+};
+
+console.log("\n== 1. AUTH ==");
+{
+  const r = await fetch(`${BASE}/api/projects`, { redirect: "manual" });
+  ok("no auth on /api -> 401 (was 307 to HTML login)", r.status === 401, `got ${r.status}`);
+  const ct = r.headers.get("content-type") || "";
+  ok("401 body is JSON", ct.includes("application/json"), ct);
+}
+{
+  const r = await fetch(`${BASE}/api/projects`, { headers: { Authorization: "Bearer wrong-token-wrong-token-wrong-tok" }, redirect: "manual" });
+  ok("wrong bearer -> 401", r.status === 401, `got ${r.status}`);
+}
+{
+  const r = await api("/api/projects");
+  ok("valid bearer -> 200", r.status === 200, `got ${r.status}`);
+}
+{
+  const r = await api("/api/settings");
+  ok("agent blocked from /api/settings -> 403", r.status === 403, `got ${r.status}`);
+}
+{
+  const r = await api("/api/invoices/11111111-1111-1111-1111-111111111111", { method: "DELETE" });
+  ok("agent blocked from DELETE -> 403", r.status === 403, `got ${r.status}`);
+}
+{
+  const r = await fetch(`${BASE}/projects`, { headers: { Authorization: `Bearer ${TOKEN}` }, redirect: "manual" });
+  ok("agent token rejected on non-API page -> 403", r.status === 403, `got ${r.status}`);
+}
+
+console.log("\n== 2. MILESTONE SCOPING (the double-flip bug) ==");
+const proj = (await api("/api/projects", { method: "POST", body: JSON.stringify({ name: `AgentTest ${Date.now()}`, clientName: "Ujian Sdn Bhd", status: "Live" }) })).body;
+ok("project created", !!proj?.id, JSON.stringify(proj));
+
+const mk = async (name, dueDate) => (await api("/api/milestones", { method: "POST", body: JSON.stringify({ projectId: proj.id, name, amount: 1000, dueDate }) })).body;
+const m1 = await mk("Fasa 1", null);
+const m2 = await mk("Fasa 2", null);
+ok("2 milestones created", !!m1?.id && !!m2?.id);
+
+const advance = async (id, status) => api(`/api/milestones/${id}`, { method: "PUT", body: JSON.stringify({ status }) });
+for (const m of [m1, m2]) {
+  await advance(m.id, "In Progress");
+  await advance(m.id, "Completed");
+}
+
+const invA = (await api("/api/invoices", { method: "POST", body: JSON.stringify({ projectId: proj.id, milestoneIds: [m1.id], type: "Deposit", amount: 1000 }) })).body;
+const invB = (await api("/api/invoices", { method: "POST", body: JSON.stringify({ projectId: proj.id, milestoneIds: [m2.id], type: "Progress", amount: 2000 }) })).body;
+ok("2 invoices created", !!invA?.id && !!invB?.id, JSON.stringify(invA));
+
+const payA = await api(`/api/invoices/${invA.id}/receipts`, { method: "POST", body: JSON.stringify({ amount: 1000, paymentMethod: "transfer" }) });
+ok("invoice A paid -> 201", payA.status === 201, `got ${payA.status} ${JSON.stringify(payA.body)}`);
+ok("only 1 milestone marked Paid", payA.body?.milestonesMarkedPaid === 1, `got ${payA.body?.milestonesMarkedPaid}`);
+ok("no unattributable milestones", payA.body?.unlinkedInvoicedMilestones === 0, `got ${payA.body?.unlinkedInvoicedMilestones}`);
+
+const after = (await api(`/api/projects/${proj.id}`)).body;
+const s1 = after.milestones.find((m) => m.id === m1.id)?.status;
+const s2 = after.milestones.find((m) => m.id === m2.id)?.status;
+ok("milestone billed on the PAID invoice -> Paid", s1 === "Paid", `got ${s1}`);
+ok("milestone billed on the UNPAID invoice stays Invoiced", s2 === "Invoiced", `got ${s2} (old code flipped this to Paid)`);
+
+console.log("\n== 3. IDEMPOTENCY ==");
+const invC = (await api("/api/invoices", { method: "POST", body: JSON.stringify({ projectId: proj.id, type: "Final", amount: 500 }) })).body;
+const key = `test-key-${Date.now()}`;
+const p1 = await api(`/api/invoices/${invC.id}/receipts`, { method: "POST", headers: { "X-Idempotency-Key": key }, body: JSON.stringify({ amount: 500 }) });
+const p2 = await api(`/api/invoices/${invC.id}/receipts`, { method: "POST", headers: { "X-Idempotency-Key": key }, body: JSON.stringify({ amount: 500 }) });
+ok("first keyed payment -> 201", p1.status === 201, `got ${p1.status}`);
+ok("retry replays same status", p2.status === 201, `got ${p2.status}`);
+ok("retry replays SAME receipt", p1.body?.receipt?.id === p2.body?.receipt?.id, `${p1.body?.receipt?.id} vs ${p2.body?.receipt?.id}`);
+ok("replay flagged in header", p2.headers.get("x-idempotent-replay") === "true");
+const rcC = (await api(`/api/invoices/${invC.id}/receipts`)).body;
+ok("exactly 1 receipt stored", Array.isArray(rcC) && rcC.length === 1, `got ${rcC?.length}`);
+
+{
+  const invD = (await api("/api/invoices", { method: "POST", body: JSON.stringify({ projectId: proj.id, type: "Final", amount: 300 }) })).body;
+  const k2 = `test-key-par-${Date.now()}`;
+  const [a, b] = await Promise.all([
+    api(`/api/invoices/${invD.id}/receipts`, { method: "POST", headers: { "X-Idempotency-Key": k2 }, body: JSON.stringify({ amount: 300 }) }),
+    api(`/api/invoices/${invD.id}/receipts`, { method: "POST", headers: { "X-Idempotency-Key": k2 }, body: JSON.stringify({ amount: 300 }) }),
+  ]);
+  const rc = (await api(`/api/invoices/${invD.id}/receipts`)).body;
+  ok("concurrent same-key -> exactly 1 receipt", rc.length === 1, `receipts=${rc.length}, statuses=${a.status}/${b.status}`);
+  ok("one call refused or replayed", [a.status, b.status].some((s) => s === 409 || s === 201), `${a.status}/${b.status}`);
+  const wrong = await api(`/api/invoices/${invD.id}/receipts`, { method: "POST", headers: { "X-Idempotency-Key": k2 }, body: JSON.stringify({ amount: 1 }) });
+  ok("same key + different body -> 422", wrong.status === 422, `got ${wrong.status}`);
+}
+
+console.log("\n== 4. CONCURRENT PAYMENTS, NO KEY (row lock) ==");
+{
+  const invE = (await api("/api/invoices", { method: "POST", body: JSON.stringify({ projectId: proj.id, type: "Final", amount: 100 }) })).body;
+  const [a, b] = await Promise.all([
+    api(`/api/invoices/${invE.id}/receipts`, { method: "POST", body: JSON.stringify({ amount: 100 }) }),
+    api(`/api/invoices/${invE.id}/receipts`, { method: "POST", body: JSON.stringify({ amount: 100 }) }),
+  ]);
+  const rc = (await api(`/api/invoices/${invE.id}/receipts`)).body;
+  const total = rc.reduce((s, r) => s + Number(r.amountPaid), 0);
+  ok("2 concurrent full payments -> 1 receipt only", rc.length === 1, `receipts=${rc.length} statuses=${a.status}/${b.status}`);
+  ok("total collected never exceeds invoice", total <= 100, `total=${total}`);
+}
+
+console.log("\n== 5. DUE MILESTONES ==");
+{
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+  const soon = new Date(Date.now() + 2 * 86400000).toISOString().split("T")[0];
+  const far = new Date(Date.now() + 40 * 86400000).toISOString().split("T")[0];
+  const mOver = await mk("Overdue milestone", yesterday);
+  const mSoon = await mk("Due soon milestone", soon);
+  await mk("Far away milestone", far);
+
+  const due = (await api("/api/milestones/due?days=3")).body;
+  ok("/api/milestones/due resolves (not shadowed by [id])", Array.isArray(due?.milestones), JSON.stringify(due).slice(0, 120));
+  const ids = due.milestones.map((m) => m.id);
+  ok("overdue milestone included", ids.includes(mOver.id));
+  ok("due-soon milestone included", ids.includes(mSoon.id));
+  ok("far milestone excluded", !due.milestones.some((m) => m.name === "Far away milestone"));
+  ok("overdue flagged", due.milestones.find((m) => m.id === mOver.id)?.overdue === true);
+  ok("counts reported", due.counts?.overdue >= 1 && due.counts?.total >= 2, JSON.stringify(due.counts));
+  const clamped = (await api("/api/milestones/due?days=9999")).body;
+  ok("days clamped to 90, not 500", clamped?.windowDays === 90, `got ${clamped?.windowDays}`);
+}
+
+console.log("\n== 6. PROJECT COMPLETION ==");
+{
+  const dry = await api(`/api/projects/${proj.id}/complete`, { method: "POST", body: JSON.stringify({ dryRun: true }) });
+  ok("dryRun -> 200", dry.status === 200, `got ${dry.status}`);
+  ok("dryRun reports blockers (invoice B unpaid)", dry.body?.checklist?.blockers?.length > 0, JSON.stringify(dry.body?.checklist?.blockers));
+  ok("dryRun changed nothing", (await api(`/api/projects/${proj.id}`)).body.status === "Live");
+
+  const refused = await api(`/api/projects/${proj.id}/complete`, { method: "POST", body: JSON.stringify({}) });
+  ok("blockers refuse completion -> 409", refused.status === 409, `got ${refused.status}`);
+
+  const forced = await api(`/api/projects/${proj.id}/complete`, { method: "POST", body: JSON.stringify({ force: true, notes: "ujian" }) });
+  ok("force -> 200", forced.status === 200, `got ${forced.status} ${JSON.stringify(forced.body).slice(0, 200)}`);
+  ok("status now Completed", forced.body?.status === "Completed", forced.body?.status);
+  ok("checklist has handover items", forced.body?.checklist?.items?.some((i) => i.kind === "handover"));
+
+  const again = await api(`/api/projects/${proj.id}/complete`, { method: "POST", body: JSON.stringify({ force: true }) });
+  ok("second completion -> 409", again.status === 409, `got ${again.status}`);
+
+  const dueAfter = (await api("/api/milestones/due?days=3")).body;
+  ok("completed project drops out of reminders", !dueAfter.milestones.some((m) => m.projectId === proj.id), JSON.stringify(dueAfter.counts));
+}
+
+console.log(`\n==== ${pass} passed, ${fail} failed ====`);
+process.exit(fail ? 1 : 0);

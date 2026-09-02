@@ -117,6 +117,7 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
         // API at /api/invoices/[id]/receipts accepts { amount, paymentMethod, paymentDate }
       });
       if (res.ok) {
+        const result = await res.json().catch(() => null);
         const updatedRes = await fetch(`/api/invoices/${invoice.id}`);
         if (updatedRes.ok) {
           const updated = await updatedRes.json();
@@ -126,6 +127,14 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
         }
         setPaymentOpen(false);
         toast.success("Payment recorded successfully");
+        // Milestones invoiced before invoices recorded their billing link cannot
+        // be attributed to this payment. Say so instead of leaving them stuck.
+        const unlinked = result?.unlinkedInvoicedMilestones ?? 0;
+        if (unlinked > 0) {
+          toast.warning(
+            `${unlinked} milestone berstatus Invoiced tiada kaitan invois — tanda Paid secara manual.`
+          );
+        }
       } else {
         const err = await res.json().catch(() => ({}));
         toast.error(apiErrorMessage(err, "Failed to record payment"));

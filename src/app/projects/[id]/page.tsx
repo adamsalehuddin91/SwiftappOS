@@ -86,7 +86,9 @@ export default async function ProjectDetailPage({
             </div>
           </div>
           <div className="flex items-center gap-3 mt-2">
-            <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${project.status === "Live"
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${project.status === "Completed"
+              ? "bg-teal-500/10 text-teal-500 border-teal-500/20"
+              : project.status === "Live"
               ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
               : project.status === "Dev"
                 ? "bg-indigo-500/10 text-indigo-500 border-indigo-500/20"

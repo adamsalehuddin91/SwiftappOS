@@ -99,6 +99,7 @@ export default function EditProjectDialog({ project }: { project: Project }) {
                                 <option value="Dev">Dev</option>
                                 <option value="UAT">UAT</option>
                                 <option value="Live">Live</option>
+                                <option value="Completed">Completed</option>
                             </select>
                         </div>
                         <div className="space-y-1">

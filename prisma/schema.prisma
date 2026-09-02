@@ -14,6 +14,7 @@ enum ProjectStatus {
   Dev
   UAT
   Live
+  Completed
 }
 
 enum MilestoneStatus {
@@ -64,6 +65,10 @@ model Project {
   clientEmail String?       @map("client_email")
   clientBrn   String?       @map("client_brn")
   isArchived  Boolean       @default(false) @map("is_archived")
+  completedAt DateTime?     @map("completed_at") @db.Timestamptz
+  // Snapshot of the handover checklist generated when the project was completed.
+  // Stored (not derived on read) so the list the client was handed stays fixed.
+  deliveryChecklist Json?   @map("delivery_checklist")
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -86,9 +91,16 @@ model Milestone {
   dueDate     DateTime?       @map("due_date") @db.Date
   createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz
 
-  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  invoices Invoice[]
-  timeLogs TimeLog[]
+  // Which invoice billed this milestone. Set when the invoice is raised so that
+  // recording payment can mark exactly these milestones Paid, instead of every
+  // Invoiced milestone on the project (which flipped milestones billed on other,
+  // still-unpaid invoices).
+  invoicedById String? @map("invoiced_by_invoice_id") @db.Uuid
+
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  invoices   Invoice[] @relation("InvoicePrimaryMilestone")
+  invoicedBy Invoice?  @relation("InvoiceBilledMilestones", fields: [invoicedById], references: [id], onDelete: SetNull)
+  timeLogs   TimeLog[]
 
   @@map("milestones")
 }
@@ -131,9 +143,10 @@ model Invoice {
   createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  project   Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  milestone Milestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
-  receipts  Receipt[]
+  project          Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  milestone        Milestone?  @relation("InvoicePrimaryMilestone", fields: [milestoneId], references: [id], onDelete: SetNull)
+  billedMilestones Milestone[] @relation("InvoiceBilledMilestones")
+  receipts         Receipt[]
 
   @@map("invoices")
 }
@@ -210,4 +223,20 @@ model Sequence {
   lastValue Int    @default(0) @map("last_value")
 
   @@map("sequences")
+}
+
+/// Replay guard for machine callers (the Hermes agent retries on timeout).
+/// A retried POST reuses its X-Idempotency-Key, so the second call replays the
+/// stored response instead of recording a second receipt for one payment.
+model IdempotencyKey {
+  key            String   @id
+  endpoint       String
+  requestHash    String   @map("request_hash")
+  responseStatus Int?     @map("response_status")
+  responseBody   Json?    @map("response_body")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz
+
+  @@index([createdAt])
+  @@map("idempotency_keys")
 }

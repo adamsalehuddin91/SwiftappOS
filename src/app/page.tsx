@@ -69,6 +69,7 @@ export default async function Home() {
     UAT: "border-amber-500/30 bg-amber-500/10 text-amber-500",
     Live: "border-emerald-500/30 bg-emerald-500/10 text-emerald-500",
     Drafting: "border-slate-500/30 bg-slate-500/10 text-slate-500",
+    Completed: "border-teal-500/30 bg-teal-500/10 text-teal-500",
   };
 
   return (

@@ -56,43 +56,50 @@ export async function POST(request: NextRequest) {
     }
 
     const data = parsed.data;
-    const invoiceNumber = await getNextNumber("invoice");
 
     // Single milestone link: explicit milestoneId, else the sole milestoneIds entry.
     const linkMilestoneId =
       data.milestoneId ?? (data.milestoneIds?.length === 1 ? data.milestoneIds[0] : null);
 
-    const invoice = await prisma.invoice.create({
-      data: {
-        invoiceNumber,
-        projectId: data.projectId,
-        milestoneId: linkMilestoneId,
-        type: data.type,
-        amount: data.amount,
-        dueDate: data.dueDate ? new Date(data.dueDate) : null,
-        items: data.items ?? [],
-        clientName: data.clientName ?? null,
-        clientEmail: data.clientEmail || null,
-        clientBrn: data.clientBrn ?? null,
-        notes: data.notes ?? null,
-      },
-      include: { project: true },
-    });
+    // One transaction: an invoice must never exist with its milestones left
+    // unmarked, and the invoice number must not be burned if the sync fails.
+    const invoice = await prisma.$transaction(async (tx) => {
+      const invoiceNumber = await getNextNumber("invoice", tx);
 
-    // Auto-sync milestones → Invoiced.
-    // If specific milestones were billed, mark exactly those; otherwise fall
-    // back to the legacy behaviour of marking every Completed milestone.
-    if (data.milestoneIds && data.milestoneIds.length > 0) {
-      await prisma.milestone.updateMany({
-        where: { id: { in: data.milestoneIds }, status: "Completed" },
-        data: { status: "Invoiced" },
+      const created = await tx.invoice.create({
+        data: {
+          invoiceNumber,
+          projectId: data.projectId,
+          milestoneId: linkMilestoneId,
+          type: data.type,
+          amount: data.amount,
+          dueDate: data.dueDate ? new Date(data.dueDate) : null,
+          items: data.items ?? [],
+          clientName: data.clientName ?? null,
+          clientEmail: data.clientEmail || null,
+          clientBrn: data.clientBrn ?? null,
+          notes: data.notes ?? null,
+        },
+        include: { project: true },
       });
-    } else if (data.projectId) {
-      await prisma.milestone.updateMany({
-        where: { projectId: data.projectId, status: "Completed" },
-        data: { status: "Invoiced" },
-      });
-    }
+
+      // Auto-sync milestones → Invoiced, and record WHICH invoice billed them.
+      // The back-link is what lets payment later mark exactly these milestones
+      // Paid instead of every Invoiced milestone on the project.
+      if (data.milestoneIds && data.milestoneIds.length > 0) {
+        await tx.milestone.updateMany({
+          where: { id: { in: data.milestoneIds }, status: "Completed" },
+          data: { status: "Invoiced", invoicedById: created.id },
+        });
+      } else if (data.projectId) {
+        await tx.milestone.updateMany({
+          where: { projectId: data.projectId, status: "Completed" },
+          data: { status: "Invoiced", invoicedById: created.id },
+        });
+      }
+
+      return created;
+    });
 
     return NextResponse.json(mapInvoice(invoice), { status: 201 });
   } catch (error) {

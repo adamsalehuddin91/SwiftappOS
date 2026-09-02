@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // ── Enums ──────────────────────────────────────────────
 
-export const ProjectStatusEnum = z.enum(["Drafting", "Dev", "UAT", "Live"]);
+export const ProjectStatusEnum = z.enum(["Drafting", "Dev", "UAT", "Live", "Completed"]);
 export const MilestoneStatusEnum = z.enum(["Pending", "In Progress", "Completed", "Invoiced", "Paid"]);
 export const InvoiceStatusEnum = z.enum(["Draft", "Sent", "Paid", "Void"]);
 export const InvoiceTypeEnum = z.enum(["Deposit", "Progress", "Final", "Monthly"]);
@@ -19,6 +19,14 @@ export const createProjectSchema = z.object({
   clientName: z.string().max(200).optional(),
   clientEmail: z.string().email("Invalid email").optional().or(z.literal("")),
   clientBrn: z.string().max(50).optional(),
+});
+
+export const completeProjectSchema = z.object({
+  // Build the checklist without writing anything.
+  dryRun: z.boolean().optional().default(false),
+  // Close the project even though blockers remain (usually an uncollected balance).
+  force: z.boolean().optional().default(false),
+  notes: z.string().max(2000).optional().nullable(),
 });
 
 export const updateProjectSchema = z.object({

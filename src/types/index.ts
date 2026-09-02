@@ -1,4 +1,4 @@
-export type ProjectStatus = "Drafting" | "Dev" | "UAT" | "Live";
+export type ProjectStatus = "Drafting" | "Dev" | "UAT" | "Live" | "Completed";
 
 export type MilestoneStatus =
   | "Pending"

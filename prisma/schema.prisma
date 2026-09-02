@@ -240,3 +240,17 @@ model IdempotencyKey {
   @@index([createdAt])
   @@map("idempotency_keys")
 }
+
+/// Failed login attempts, for the brute-force guard on /api/auth/login.
+/// Held in Postgres rather than in a Map: an in-memory counter resets on every
+/// redeploy and is not shared if the app is ever scaled past one container.
+/// Only failures are stored, and only a hash of the address — a successful
+/// login deletes that bucket.
+model LoginAttempt {
+  id        String   @id @default(uuid()) @db.Uuid
+  ipHash    String   @map("ip_hash")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([ipHash, createdAt])
+  @@map("login_attempts")
+}

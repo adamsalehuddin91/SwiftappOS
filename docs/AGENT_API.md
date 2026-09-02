@@ -26,6 +26,11 @@ distinct token. Sessions are stateless, so logout clears the browser's own copy;
 to end every outstanding session at once, rotate `SESSION_SECRET` (or
 `SWIFTAPP_PASSWORD`) and redeploy.
 
+`/api/auth/login` is rate limited: 10 wrong passwords per address per 15 minutes,
+then `429` with `Retry-After` until the window clears. Agent traffic never touches
+that route — it carries the bearer token instead — so the limit cannot lock the
+agent out.
+
 ```bash
 curl -sS https://os.example.my/api/milestones/due?days=3 \
   -H "Authorization: Bearer $AGENT_API_TOKEN"

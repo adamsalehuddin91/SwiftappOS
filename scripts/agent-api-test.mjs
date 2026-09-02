@@ -2,6 +2,7 @@
 // deployment, never at production.
 //
 //   SWIFTOS_BASE_URL=http://localhost:3000 AGENT_API_TOKEN=<token> npm run test:agent
+try { (await import("dotenv")).default.config({ quiet: true }); } catch { /* optional */ }
 const BASE = process.env.SWIFTOS_BASE_URL || "http://localhost:3000";
 const TOKEN = process.env.AGENT_API_TOKEN || "local-test-agent-token-0123456789abcdef";
 const PASSWORD = process.env.SWIFTAPP_PASSWORD || "test-pw-local-only";
@@ -236,6 +237,73 @@ console.log("\n== 7. SESSION COOKIE ==");
   const out = await fetch(`${BASE}/api/auth/logout`, { method: "POST", redirect: "manual" });
   ok("logout -> 200", out.status === 200, `got ${out.status}`);
   ok("logout clears the cookie", /swiftapp-session=(;|"")/.test(out.headers.get("set-cookie") || ""), out.headers.get("set-cookie") || "");
+}
+
+console.log("\n== 8. LOGIN RATE LIMIT ==");
+{
+  // This section burns the login budget for this address, so it runs last and
+  // clears the counter directly afterwards. Skipped when the database is not
+  // reachable from here (e.g. testing a remote deployment).
+  let db = null;
+  try {
+    const { Client } = await import("pg");
+    const conn = process.env.DATABASE_URL;
+    if (!conn) throw new Error("DATABASE_URL not set");
+    db = new Client({ connectionString: conn });
+    await db.connect();
+    await db.query("delete from login_attempts");
+  } catch (e) {
+    db = null;
+    console.log(`  SKIP  rate limit tests — no database access (${e.message})`);
+  }
+
+  if (db) {
+    const login = (pw) =>
+      fetch(`${BASE}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pw }),
+        redirect: "manual",
+      });
+
+    const max = Number(process.env.LOGIN_MAX_FAILURES || 10);
+
+    let lastBody = null;
+    let statuses = [];
+    for (let i = 0; i < max; i++) {
+      const r = await login(`wrong-guess-${i}`);
+      statuses.push(r.status);
+      lastBody = await r.json().catch(() => null);
+    }
+    ok(`${max} wrong passwords all answer 401`, statuses.every((s) => s === 401), statuses.join(","));
+    ok("counter surfaced only near the end", lastBody?.attemptsRemaining === 0, JSON.stringify(lastBody));
+
+    const blocked = await login("wrong-again");
+    ok("next attempt -> 429", blocked.status === 429, `got ${blocked.status}`);
+    const retryAfter = blocked.headers.get("retry-after");
+    ok("429 carries Retry-After", retryAfter !== null && Number(retryAfter) > 0, String(retryAfter));
+
+    // The gate runs before the password check, so even the right password is
+    // refused while locked. If it were not, an attacker mid-sweep would walk
+    // straight through the lock the moment they guessed correctly.
+    const rightButLocked = await login(PASSWORD);
+    ok("CORRECT password also refused while locked", rightButLocked.status === 429, `got ${rightButLocked.status}`);
+
+    await db.query("delete from login_attempts");
+    const afterReset = await login(PASSWORD);
+    ok("login works again once the window clears", afterReset.status === 200, `got ${afterReset.status}`);
+
+    // A success wipes the bucket, so a few typos before the real password cost
+    // nothing later.
+    await login("typo-one");
+    await login("typo-two");
+    await login(PASSWORD);
+    const { rows } = await db.query("select count(*)::int n from login_attempts");
+    ok("successful login clears earlier failures", rows[0].n === 0, `rows=${rows[0].n}`);
+
+    await db.query("delete from login_attempts");
+    await db.end();
+  }
 }
 
 console.log(`\n==== ${pass} passed, ${fail} failed ====`);

@@ -27,7 +27,14 @@ export default function LoginPage() {
         router.refresh();
       } else {
         const data = await res.json();
-        setError(data.error || "Invalid password");
+        // Only surface the counter once it is nearly spent. Printing it on
+        // every attempt would hand a script the exact budget it has left.
+        const remaining = data.attemptsRemaining;
+        setError(
+          typeof remaining === "number" && remaining <= 3 && remaining > 0
+            ? `${data.error || "Invalid password"} — ${remaining} attempt${remaining === 1 ? "" : "s"} left`
+            : data.error || "Invalid password"
+        );
       }
     } catch {
       setError("Login failed");

@@ -121,6 +121,7 @@ export const createQuotationSchema = z.object({
   items: z.array(quotationItemSchema).min(1, "At least one item required"),
   notes: z.string().max(5000).optional().nullable(),
   validUntil: z.string().optional().nullable(),
+  allowDuplicate: z.boolean().optional().default(false),
 });
 
 export const updateQuotationSchema = z.object({

@@ -4,7 +4,9 @@ import { mapQuotation } from "@/lib/mappers";
 import { createQuotationSchema, paginationSchema } from "@/lib/validations";
 import { getNextNumber } from "@/lib/sequences";
 import { getPaginationParams, buildPaginatedResponse } from "@/lib/pagination";
-import { sanitizeForCaller } from "@/lib/agent-guard";
+import { callerLabel, sanitizeForCaller } from "@/lib/agent-guard";
+import { recordAudit } from "@/lib/audit";
+import { idempotencyKeyFrom, withIdempotency } from "@/lib/idempotency";
 
 export async function GET(request: NextRequest) {
   try {
@@ -64,24 +66,74 @@ export async function POST(request: NextRequest) {
       0
     );
 
-    const quotationNumber = await getNextNumber("quotation");
+    return await withIdempotency(
+      idempotencyKeyFrom(request),
+      "POST /api/quotations",
+      parsed.data,
+      async () => {
+        // Same reasoning as invoices: quotation numbers are sequential and
+        // permanent, so a retry or a double click burns one and leaves a
+        // duplicate document in front of the client.
+        if (!data.allowDuplicate) {
+          const recent = await prisma.quotation.findFirst({
+            where: {
+              clientName: data.clientName,
+              totalAmount,
+              status: "Draft",
+              createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) },
+            },
+            orderBy: { createdAt: "desc" },
+          });
 
-    const quotation = await prisma.quotation.create({
-      data: {
-        quotationNumber,
-        projectId: data.projectId ?? null,
-        clientName: data.clientName,
-        clientEmail: data.clientEmail || null,
-        clientBrn: data.clientBrn ?? null,
-        clientPhone: data.clientPhone ?? null,
-        items: data.items,
-        totalAmount,
-        notes: data.notes ?? null,
-        validUntil: data.validUntil ? new Date(data.validUntil) : null,
-      },
-    });
+          if (recent) {
+            return {
+              status: 409,
+              body: {
+                error: `An identical draft quotation (${recent.quotationNumber}) was created ${Math.round(
+                  (Date.now() - recent.createdAt.getTime()) / 1000
+                )}s ago.`,
+                existingQuotationId: recent.id,
+                existingQuotationNumber: recent.quotationNumber,
+                hint: 'Send { "allowDuplicate": true } if a second one is genuinely intended.',
+              },
+            };
+          }
+        }
 
-    return NextResponse.json(mapQuotation(quotation), { status: 201 });
+        const quotation = await prisma.$transaction(async (tx) => {
+          const quotationNumber = await getNextNumber("quotation", tx);
+
+          return tx.quotation.create({
+            data: {
+              quotationNumber,
+              projectId: data.projectId ?? null,
+              clientName: data.clientName,
+              clientEmail: data.clientEmail || null,
+              clientBrn: data.clientBrn ?? null,
+              clientPhone: data.clientPhone ?? null,
+              items: data.items,
+              totalAmount,
+              notes: data.notes ?? null,
+              validUntil: data.validUntil ? new Date(data.validUntil) : null,
+              // Always Draft: createQuotationSchema has no `status` field, so a
+              // caller cannot mint one already marked Sent. Moving it on takes a
+              // separate, deliberate PATCH.
+              createdBy: callerLabel(request),
+            },
+          });
+        });
+
+        await recordAudit({
+          request,
+          entity: "quotation",
+          entityId: quotation.id,
+          action: "create",
+          after: mapQuotation(quotation),
+        });
+
+        return { status: 201, body: sanitizeForCaller(request, mapQuotation(quotation)) };
+      }
+    );
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to create quotation" },

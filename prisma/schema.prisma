@@ -120,6 +120,7 @@ model Quotation {
   status          QuotationStatus @default(Draft)
   validUntil      DateTime?       @map("valid_until") @db.Date
   notes           String?
+  createdBy       String?         @map("created_by")
   createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 

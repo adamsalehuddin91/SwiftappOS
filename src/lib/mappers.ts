@@ -84,6 +84,7 @@ export function mapQuotation(q: PrismaQuotation): Quotation {
       ? q.validUntil.toISOString().split("T")[0]
       : undefined,
     notes: q.notes ?? undefined,
+    created_by: q.createdBy ?? undefined,
     created_at: q.createdAt.toISOString(),
     updated_at: q.updatedAt.toISOString(),
   };

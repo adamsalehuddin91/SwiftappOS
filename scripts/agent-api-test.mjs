@@ -390,6 +390,80 @@ console.log("\n== 9. AGENT GUARDS (P1–P5) ==");
   ok("P2 audit filters by actor", filtered.entries.every((e) => e.actor === "agent"));
 }
 
+console.log("\n== 10. QUOTATION WRITE PATH ==");
+{
+  const stamp = Date.now();
+  const client = `AgentTest Quote ${stamp}`;
+  const items = [
+    { description: "Setup sistem", quantity: 1, unitPrice: 3500 },
+    { description: "Diskaun Rakan Portfolio", quantity: 1, unitPrice: -500 },
+  ];
+
+  const created = await api("/api/quotations", {
+    method: "POST",
+    body: JSON.stringify({ clientName: client, clientEmail: "sulit@contoh.my", items }),
+  });
+  ok("agent may now create a quotation", created.status === 201, `got ${created.status} ${JSON.stringify(created.body).slice(0, 120)}`);
+  ok("total computed from the line items", created.body?.total_amount === 3000, `got ${created.body?.total_amount}`);
+  ok("negative line item accepted (named discount)", Array.isArray(created.body?.items) && created.body.items.length === 2);
+  ok("lands as Draft, never Sent", created.body?.status === "Draft", created.body?.status);
+  ok("attributed to the agent", created.body?.created_by === "agent", created.body?.created_by);
+  ok("client_email redacted from the agent's own copy", created.body?.client_email === undefined);
+
+  // PUT is still shut: the agent drafts once, edits happen in the browser.
+  const edit = await api(`/api/quotations/${created.body.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ clientName: "Dirampas", items }),
+  });
+  ok("agent still cannot rewrite a quotation body", edit.status === 403, `got ${edit.status}`);
+
+  // Duplicate guard, mirroring invoices.
+  const dup = await api("/api/quotations", {
+    method: "POST",
+    body: JSON.stringify({ clientName: client, items }),
+  });
+  ok("identical draft minutes later -> 409", dup.status === 409, `got ${dup.status}`);
+  ok("409 names the existing quotation", dup.body?.existingQuotationNumber === created.body.quotation_number, JSON.stringify(dup.body).slice(0, 140));
+
+  const forced = await api("/api/quotations", {
+    method: "POST",
+    body: JSON.stringify({ clientName: client, items, allowDuplicate: true }),
+  });
+  ok("allowDuplicate lets a genuine second through", forced.status === 201, `got ${forced.status}`);
+
+  // Idempotency: quotation numbers are sequential, a retry must not burn one.
+  const qk = `quote-key-${stamp}`;
+  const q1 = await api("/api/quotations", {
+    method: "POST", headers: { "X-Idempotency-Key": qk },
+    body: JSON.stringify({ clientName: `${client} B`, items }),
+  });
+  const q2 = await api("/api/quotations", {
+    method: "POST", headers: { "X-Idempotency-Key": qk },
+    body: JSON.stringify({ clientName: `${client} B`, items }),
+  });
+  ok("retry replays the same quotation number",
+    q1.body?.quotation_number === q2.body?.quotation_number, `${q1.body?.quotation_number} vs ${q2.body?.quotation_number}`);
+
+  // Status still moves through the workflow, and only through it.
+  const toSent = await api(`/api/quotations/${created.body.id}`, {
+    method: "PATCH", body: JSON.stringify({ status: "Sent" }),
+  });
+  ok("Draft -> Sent allowed", toSent.status === 200, `got ${toSent.status}`);
+  const skip = await api(`/api/quotations/${q1.body.id}`, {
+    method: "PATCH", body: JSON.stringify({ status: "Accepted" }),
+  });
+  ok("Draft -> Accepted refused (must pass through Sent)", skip.status === 400, `got ${skip.status}`);
+
+  const auditQ = (await api("/api/audit?limit=50&entity=quotation")).body;
+  ok("quotation create is audited", auditQ.entries.some((e) => e.action === "create"));
+  ok("quotation status change is audited", auditQ.entries.some((e) => e.action === "status"));
+
+  // The global receipt list, newly opened and redacted.
+  const receipts = await api("/api/receipts?limit=5");
+  ok("GET /api/receipts now reachable", receipts.status === 200, `got ${receipts.status}`);
+  ok("receipt list carries no client email", !JSON.stringify(receipts.body).includes("client_email"));
+}
+
 console.log("\n== 8. LOGIN RATE LIMIT ==");
 {
   // This section burns the login budget for this address, so it runs last and

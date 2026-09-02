@@ -40,6 +40,8 @@ const AGENT_ROUTES: ReadonlyArray<{ method: string; pattern: RegExp }> = [
   { method: "PUT", pattern: new RegExp(`^/api/milestones/${UUID}$`) },
 
   { method: "GET", pattern: new RegExp(`^/api/quotations$`) },
+  // Create only. PUT stays shut: the agent drafts once, edits happen in the browser.
+  { method: "POST", pattern: new RegExp(`^/api/quotations$`) },
   { method: "GET", pattern: new RegExp(`^/api/quotations/${UUID}$`) },
   { method: "PATCH", pattern: new RegExp(`^/api/quotations/${UUID}$`) },
   { method: "POST", pattern: new RegExp(`^/api/quotations/${UUID}/convert$`) },
@@ -48,6 +50,7 @@ const AGENT_ROUTES: ReadonlyArray<{ method: string; pattern: RegExp }> = [
   { method: "POST", pattern: new RegExp(`^/api/invoices$`) },
   { method: "GET", pattern: new RegExp(`^/api/invoices/${UUID}$`) },
   { method: "PATCH", pattern: new RegExp(`^/api/invoices/${UUID}$`) },
+  { method: "GET", pattern: new RegExp(`^/api/receipts$`) },
   { method: "GET", pattern: new RegExp(`^/api/invoices/${UUID}/receipts$`) },
   { method: "POST", pattern: new RegExp(`^/api/invoices/${UUID}/receipts$`) },
 ];

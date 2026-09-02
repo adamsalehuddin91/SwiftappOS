@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createReceiptSchema } from "@/lib/validations";
 import { getNextNumber } from "@/lib/sequences";
+import { sanitizeForCaller } from "@/lib/agent-guard";
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,7 +21,8 @@ export async function GET(request: NextRequest) {
       prisma.receipt.count(),
     ]);
 
-    return NextResponse.json({
+    return NextResponse.json(
+      sanitizeForCaller(request, {
       data: receipts.map((r) => ({
         id: r.id,
         receiptNumber: r.receiptNumber,
@@ -35,7 +37,8 @@ export async function GET(request: NextRequest) {
       total,
       page,
       totalPages: Math.ceil(total / limit),
-    });
+      })
+    );
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch receipts" }, { status: 500 });
   }

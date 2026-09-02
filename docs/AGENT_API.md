@@ -80,17 +80,23 @@ numbers printed on them.
 | `GET` | `/api/milestones/due?days=N` | Due + overdue milestones |
 | `POST` | `/api/milestones` | Create |
 | `PUT` | `/api/milestones/{id}` | Update (status transitions enforced) |
-| `GET` | `/api/quotations` | List |
+| `GET` `POST` | `/api/quotations` | List / draft a new one (always `Draft`) |
 | `GET` `PATCH` | `/api/quotations/{id}` | Read / change status |
 | `POST` | `/api/quotations/{id}/convert` | Quotation → invoice |
 | `GET` `POST` | `/api/invoices` | List / create |
 | `GET` `PATCH` | `/api/invoices/{id}` | Read / change status |
 | `GET` `POST` | `/api/invoices/{id}/receipts` | Read / record payment |
+| `GET` | `/api/receipts` | All receipts, newest first |
 
 The allowlist lives in `src/lib/agent-auth.ts`. Add a route there and here, or it
 stays shut.
 
 ### Two further limits, applied inside the routes
+
+**Quotations may be drafted, not edited.** `POST /api/quotations` is open;
+`PUT /api/quotations/{id}` is not. `createQuotationSchema` has no `status` field, so
+a new quotation is always `Draft` — moving it to `Sent` takes a separate, deliberate
+`PATCH`. The agent drafts once and a human edits the numbers in the browser.
 
 **Writes are status-only.** `PUT /api/projects/{id}` and `PUT /api/milestones/{id}`
 take a whole record, so without this the agent could rewrite a milestone's amount —

@@ -16,7 +16,7 @@ const UUID = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-
 
 /**
  * Everything the agent may do. Deliberately excludes:
- *   - every DELETE (invoices, quotations, projects, milestones, costs)
+ *   - every DELETE except an unused milestone (invoices, quotations, projects, costs)
  *   - /api/settings/* (company details, bank account, logo upload)
  *   - /api/auth/*
  *   - PUT edits to quotation/invoice bodies — the agent moves things through
@@ -33,12 +33,16 @@ const AGENT_ROUTES: ReadonlyArray<{ method: string; pattern: RegExp }> = [
   { method: "GET", pattern: new RegExp(`^/api/projects$`) },
   { method: "POST", pattern: new RegExp(`^/api/projects$`) },
   { method: "GET", pattern: new RegExp(`^/api/projects/${UUID}$`) },
-  { method: "PUT", pattern: new RegExp(`^/api/projects/${UUID}$`) },
+  // PATCH, not PUT: partial edits only, and the field list is enforced in the
+  // route. PUT takes the whole record and stays browser-only.
+  { method: "PATCH", pattern: new RegExp(`^/api/projects/${UUID}$`) },
   { method: "POST", pattern: new RegExp(`^/api/projects/${UUID}/complete$`) },
 
   { method: "GET", pattern: new RegExp(`^/api/milestones/due$`) },
   { method: "POST", pattern: new RegExp(`^/api/milestones$`) },
   { method: "PUT", pattern: new RegExp(`^/api/milestones/${UUID}$`) },
+  // Confined in the route to milestones never billed and with no hours logged.
+  { method: "DELETE", pattern: new RegExp(`^/api/milestones/${UUID}$`) },
 
   { method: "GET", pattern: new RegExp(`^/api/quotations$`) },
   // Create only. PUT stays shut: the agent drafts once, edits happen in the browser.

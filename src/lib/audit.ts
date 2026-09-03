@@ -28,7 +28,8 @@ export type AuditAction =
   | "update"
   | "status"
   | "payment"
-  | "complete";
+  | "complete"
+  | "delete";
 
 interface AuditInput {
   request: Request;

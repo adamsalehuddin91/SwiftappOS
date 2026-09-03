@@ -77,11 +77,12 @@ numbers printed on them.
 | `GET` | `/api/analytics` | Cashflow — collected, pending, monthly |
 | `GET` | `/api/billing/stats` | Billing summary |
 | `GET` `POST` | `/api/projects` | List / create |
-| `GET` `PUT` | `/api/projects/{id}` | Read / update (status, client details) |
+| `GET` `PATCH` | `/api/projects/{id}` | Read / partial edit (status + client details) |
 | `POST` | `/api/projects/{id}/complete` | Close project + freeze checklist |
 | `GET` | `/api/milestones/due?days=N` | Due + overdue milestones |
 | `POST` | `/api/milestones` | Create |
 | `PUT` | `/api/milestones/{id}` | Update (status transitions enforced) |
+| `DELETE` | `/api/milestones/{id}` | Only if never billed and no hours logged |
 | `GET` `POST` | `/api/quotations` | List / draft a new one (always `Draft`) |
 | `GET` | `/api/quotations/{id}` | Read |
 | `POST` | `/api/quotations/{id}/convert` | Quotation → invoice |
@@ -111,10 +112,22 @@ loop of those leaves nothing behind. Browser callers are never limited here.
 a new quotation is always `Draft` — moving it to `Sent` takes a separate, deliberate
 `PATCH`. The agent drafts once and a human edits the numbers in the browser.
 
-**Writes are status-only.** `PUT /api/projects/{id}` and `PUT /api/milestones/{id}`
-take a whole record, so without this the agent could rewrite a milestone's amount —
-RM1,000 into RM100 — while nominally updating a status. Any field other than
-`status` is refused with `403`. The browser is unaffected.
+**Writes are field-limited.** `PUT` takes a whole record and is browser-only. The
+agent edits a project through `PATCH`, where the allowed fields are `status`,
+`description`, `clientName`, `clientEmail`, `clientBrn` and `sowDetails` — anything
+else is `403`. `name` and `isArchived` are excluded on purpose: renaming rewrites how
+every past document refers to a project, and archiving is a disappearance rather than
+an edit. Milestones remain `status`-only, because `PUT` there reaches `amount` and
+RM1,000 becomes RM100 while nominally updating a status.
+
+**Deleting a milestone is narrower than it looks.** `time_logs` cascade — every hour
+logged against it is destroyed — and `invoices.milestone_id` is set to null, so the
+invoice survives having forgotten what it billed. The agent may therefore delete only
+a milestone that was never used: still `Pending` or `In Progress`, never billed, no
+hours against it. Anything else is `409` listing the reasons. Deleting the same id
+twice answers `200 {"alreadyDeleted": true}` rather than an error. A browser caller is
+assumed to be looking at the screen and is not blocked, but the response and the audit
+entry now report what went with it.
 
 **Responses are redacted.** `client_email`, `client_phone`, `client_brn`,
 `sow_details`, `notes` and `description` are stripped from everything the agent

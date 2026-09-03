@@ -21,6 +21,29 @@ const api = async (path, init = {}) => {
   return { status: res.status, body, headers: res.headers };
 };
 
+// Lazily-authenticated browser caller, so tests can prove a guard applies to the
+// agent only and does not quietly cripple the UI.
+let browserCookie = null;
+const asBrowser = async (path, init = {}) => {
+  if (!browserCookie) {
+    const res = await fetch(`${BASE}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: PASSWORD }),
+      redirect: "manual",
+    });
+    browserCookie = (res.headers.get("set-cookie") || "").match(/swiftapp-session=([^;]*)/)?.[1] ?? null;
+  }
+  const res = await fetch(BASE + path, {
+    ...init,
+    headers: { "Content-Type": "application/json", cookie: `swiftapp-session=${browserCookie}`, ...(init.headers || {}) },
+    redirect: "manual",
+  });
+  let body = null;
+  try { body = await res.json(); } catch { body = null; }
+  return { ok: res.ok, status: res.status, body };
+};
+
 console.log("\n== 1. AUTH ==");
 {
   const r = await fetch(`${BASE}/api/projects`, { redirect: "manual" });
@@ -540,6 +563,91 @@ console.log("\n== 11. PDF, PROFILE, VALIDATION, WRITE CEILING ==");
 
   const settings = await api("/api/settings");
   ok("full settings still refused", settings.status === 403, `got ${settings.status}`);
+}
+
+console.log("\n== 12. NARROW DELETE + PROJECT PATCH ==");
+{
+  const tag = Date.now();
+  const proj = (await api("/api/projects", {
+    method: "POST",
+    body: JSON.stringify({ name: `AgentTest Guard2 ${tag}`, clientName: "Asal Sdn Bhd", status: "Dev" }),
+  })).body;
+
+  const mk = async (name) => (await api("/api/milestones", {
+    method: "POST",
+    body: JSON.stringify({ projectId: proj.id, name, amount: 500 }),
+  })).body;
+
+  // ── PATCH: the agent's only project write ─────────────────────────────
+  const okPatch = await api(`/api/projects/${proj.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ clientName: "Baharu Sdn Bhd", sowDetails: "Skop dikemas kini", status: "UAT" }),
+  });
+  ok("agent may PATCH detail fields + status", okPatch.status === 200, `got ${okPatch.status} ${JSON.stringify(okPatch.body).slice(0, 120)}`);
+  ok("client name actually changed", okPatch.body?.client_name === "Baharu Sdn Bhd", okPatch.body?.client_name);
+  ok("status changed in the same call", okPatch.body?.status === "UAT", okPatch.body?.status);
+
+  const renamed = await api(`/api/projects/${proj.id}`, {
+    method: "PATCH", body: JSON.stringify({ name: "Nama Dirampas" }),
+  });
+  ok("agent cannot rename a project", renamed.status === 403, `got ${renamed.status}`);
+
+  const archived = await api(`/api/projects/${proj.id}`, {
+    method: "PATCH", body: JSON.stringify({ isArchived: true }),
+  });
+  ok("agent cannot archive a project", archived.status === 403, `got ${archived.status}`);
+
+  const viaPut = await api(`/api/projects/${proj.id}`, {
+    method: "PUT", body: JSON.stringify({ status: "Live" }),
+  });
+  ok("PUT is browser-only now", viaPut.status === 403, `got ${viaPut.status}`);
+
+  const auditP = (await api(`/api/audit?limit=20&entity=project&entityId=${proj.id}`)).body;
+  const upd = auditP.entries.find((e) => e.action === "update");
+  ok("project edit audited with before/after", !!upd?.before && !!upd?.after);
+  ok("audit shows the old client name", upd?.before?.client_name === "Asal Sdn Bhd", JSON.stringify(upd?.before).slice(0, 100));
+
+  // ── DELETE: unused milestone only ─────────────────────────────────────
+  const spare = await mk("Tersilap cipta");
+  const del = await api(`/api/milestones/${spare.id}`, { method: "DELETE" });
+  ok("agent may delete an unused milestone", del.status === 200, `got ${del.status} ${JSON.stringify(del.body)}`);
+  ok("response reports nothing was destroyed with it", del.body?.timeLogsDestroyed === 0, JSON.stringify(del.body));
+
+  const again = await api(`/api/milestones/${spare.id}`, { method: "DELETE" });
+  ok("second delete is a safe no-op, not an error", again.status === 200 && again.body?.alreadyDeleted === true, `got ${again.status} ${JSON.stringify(again.body)}`);
+
+  const auditD = (await api(`/api/audit?limit=20&entity=milestone&entityId=${spare.id}`)).body;
+  ok("deletion audited with a before snapshot", auditD.entries.some((e) => e.action === "delete" && e.before));
+
+  // Billed milestone: refused.
+  const billed = await mk("Dah dibil");
+  await api(`/api/milestones/${billed.id}`, { method: "PUT", body: JSON.stringify({ status: "In Progress" }) });
+  await api(`/api/milestones/${billed.id}`, { method: "PUT", body: JSON.stringify({ status: "Completed" }) });
+  await api("/api/invoices", {
+    method: "POST",
+    body: JSON.stringify({ projectId: proj.id, milestoneIds: [billed.id], type: "Progress", amount: 500 }),
+  });
+
+  const refused = await api(`/api/milestones/${billed.id}`, { method: "DELETE" });
+  ok("billed milestone refused -> 409", refused.status === 409, `got ${refused.status}`);
+  ok("409 lists the reasons", Array.isArray(refused.body?.reasons) && refused.body.reasons.length > 0, JSON.stringify(refused.body).slice(0, 180));
+  const stillThere = (await api(`/api/projects/${proj.id}`)).body.milestones.some((m) => m.id === billed.id);
+  ok("refused milestone is still there", stillThere);
+
+  // Milestone with hours logged: refused, and the reason says how many.
+  const worked = await mk("Ada jam direkod");
+  const logged = await asBrowser(`/api/projects/${proj.id}/time`, {
+    method: "POST",
+    body: JSON.stringify({ milestoneId: worked.id, hours: 3, description: "Kerja ujian", date: new Date().toISOString().split("T")[0] }),
+  });
+  if (logged.ok) {
+    const withHours = await api(`/api/milestones/${worked.id}`, { method: "DELETE" });
+    ok("milestone with time logs refused -> 409", withHours.status === 409, `got ${withHours.status}`);
+    ok("409 says how many hours would be destroyed",
+      String(JSON.stringify(withHours.body)).includes("time log"), JSON.stringify(withHours.body).slice(0, 180));
+  } else {
+    console.log(`  SKIP  time-log checks — could not log time (${logged.status})`);
+  }
 }
 
 console.log("\n== 8. LOGIN RATE LIMIT ==");

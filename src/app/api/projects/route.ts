@@ -6,6 +6,7 @@ import { getPaginationParams, buildPaginatedResponse } from "@/lib/pagination";
 import { callerLabel, sanitizeForCaller } from "@/lib/agent-guard";
 import { recordAudit } from "@/lib/audit";
 import { idempotencyKeyFrom, withIdempotency } from "@/lib/idempotency";
+import { checkAgentWriteLimit } from "@/lib/agent-rate-limit";
 
 export async function GET(request: NextRequest) {
   try {
@@ -61,6 +62,9 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
+
+    const limited = await checkAgentWriteLimit(request);
+    if (limited) return limited;
 
     const { name, description, status, sowDetails, clientName, clientEmail } = parsed.data;
 

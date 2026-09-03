@@ -7,6 +7,7 @@ import { getPaginationParams, buildPaginatedResponse } from "@/lib/pagination";
 import { callerLabel, sanitizeForCaller } from "@/lib/agent-guard";
 import { recordAudit } from "@/lib/audit";
 import { idempotencyKeyFrom, withIdempotency } from "@/lib/idempotency";
+import { checkAgentWriteLimit } from "@/lib/agent-rate-limit";
 
 export async function GET(request: NextRequest) {
   try {
@@ -60,7 +61,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
 
+    const limited = await checkAgentWriteLimit(request);
+    if (limited) return limited;
+
     const data = parsed.data;
+
+    // A projectId that does not exist used to reach Postgres and come back as a
+    // foreign-key violation — a 500 that tells the caller nothing about what it
+    // got wrong.
+    if (data.projectId) {
+      const project = await prisma.project.findUnique({
+        where: { id: data.projectId },
+        select: { id: true },
+      });
+      if (!project) {
+        return NextResponse.json(
+          { error: `Project ${data.projectId} does not exist.` },
+          { status: 400 }
+        );
+      }
+    }
+
     const totalAmount = data.items.reduce(
       (sum, item) => sum + item.quantity * item.unitPrice,
       0

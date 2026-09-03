@@ -24,6 +24,7 @@ const UUID = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-
  */
 const AGENT_ROUTES: ReadonlyArray<{ method: string; pattern: RegExp }> = [
   { method: "GET", pattern: new RegExp(`^/api/agent/status$`) },
+  { method: "GET", pattern: new RegExp(`^/api/agent/business-profile$`) },
   { method: "GET", pattern: new RegExp(`^/api/audit$`) },
   { method: "GET", pattern: new RegExp(`^/api/dashboard$`) },
   { method: "GET", pattern: new RegExp(`^/api/analytics$`) },
@@ -43,7 +44,11 @@ const AGENT_ROUTES: ReadonlyArray<{ method: string; pattern: RegExp }> = [
   // Create only. PUT stays shut: the agent drafts once, edits happen in the browser.
   { method: "POST", pattern: new RegExp(`^/api/quotations$`) },
   { method: "GET", pattern: new RegExp(`^/api/quotations/${UUID}$`) },
-  { method: "PATCH", pattern: new RegExp(`^/api/quotations/${UUID}$`) },
+  // Deliberately no PATCH. Marking a quotation Sent locks it against editing
+  // (PUT refuses anything past Draft), so an agent that jumps the gun locks the
+  // owner out of a document whose prices are still under review. Status changes
+  // happen in the browser.
+  { method: "GET", pattern: new RegExp(`^/api/quotations/${UUID}/pdf$`) },
   { method: "POST", pattern: new RegExp(`^/api/quotations/${UUID}/convert$`) },
 
   { method: "GET", pattern: new RegExp(`^/api/invoices$`) },

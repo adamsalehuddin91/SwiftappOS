@@ -444,24 +444,102 @@ console.log("\n== 10. QUOTATION WRITE PATH ==");
   ok("retry replays the same quotation number",
     q1.body?.quotation_number === q2.body?.quotation_number, `${q1.body?.quotation_number} vs ${q2.body?.quotation_number}`);
 
-  // Status still moves through the workflow, and only through it.
-  const toSent = await api(`/api/quotations/${created.body.id}`, {
-    method: "PATCH", body: JSON.stringify({ status: "Sent" }),
-  });
-  ok("Draft -> Sent allowed", toSent.status === 200, `got ${toSent.status}`);
-  const skip = await api(`/api/quotations/${q1.body.id}`, {
-    method: "PATCH", body: JSON.stringify({ status: "Accepted" }),
-  });
-  ok("Draft -> Accepted refused (must pass through Sent)", skip.status === 400, `got ${skip.status}`);
+  // Status changes are no longer the agent's to make — covered in section 11.
 
   const auditQ = (await api("/api/audit?limit=50&entity=quotation")).body;
   ok("quotation create is audited", auditQ.entries.some((e) => e.action === "create"));
-  ok("quotation status change is audited", auditQ.entries.some((e) => e.action === "status"));
 
   // The global receipt list, newly opened and redacted.
   const receipts = await api("/api/receipts?limit=5");
   ok("GET /api/receipts now reachable", receipts.status === 200, `got ${receipts.status}`);
   ok("receipt list carries no client email", !JSON.stringify(receipts.body).includes("client_email"));
+}
+
+console.log("\n== 11. PDF, PROFILE, VALIDATION, WRITE CEILING ==");
+{
+  const tag = Date.now();
+  const pdfClient = `Ujian PDF ${tag} Sdn Bhd`;
+  const proj = (await api("/api/projects", {
+    method: "POST",
+    body: JSON.stringify({ name: `AgentTest PDF ${tag}`, clientName: pdfClient }),
+  })).body;
+
+  // ── projectId validation ────────────────────────────────────────────
+  const ghost = "11111111-2222-4333-8444-555555555555";
+  const badQ = await api("/api/quotations", {
+    method: "POST",
+    body: JSON.stringify({
+      clientName: "Hantu", projectId: ghost,
+      items: [{ description: "x", quantity: 1, unitPrice: 100 }],
+    }),
+  });
+  ok("quotation with unknown projectId -> 400 (was a 500 FK violation)", badQ.status === 400, `got ${badQ.status}`);
+  ok("400 names the offending id", String(badQ.body?.error).includes(ghost), JSON.stringify(badQ.body));
+
+  const badI = await api("/api/invoices", {
+    method: "POST",
+    body: JSON.stringify({ projectId: ghost, type: "Deposit", amount: 100 }),
+  });
+  ok("invoice with unknown projectId -> 400", badI.status === 400, `got ${badI.status}`);
+
+  // ── quotation status is no longer the agent's to change ─────────────
+  const q = (await api("/api/quotations", {
+    method: "POST",
+    body: JSON.stringify({
+      clientName: pdfClient, projectId: proj.id,
+      items: [
+        { description: "Sistem Pengurusan — pembinaan penuh", quantity: 1, unitPrice: 9000 },
+        { description: "Kadar Keluarga — pembinaan portfolio", quantity: 1, unitPrice: -9000 },
+      ],
+      validUntil: "2026-12-31",
+    }),
+  })).body;
+  ok("quotation created with a named discount", q?.total_amount === 0, `got ${q?.total_amount} — ${JSON.stringify(q).slice(0, 140)}`);
+  if (!q?.id) { console.log("  SKIP  remaining section 11 checks — no quotation to work with"); }
+
+  if (q?.id) {
+  const patch = await api(`/api/quotations/${q.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status: "Sent" }),
+  });
+  ok("agent can no longer mark a quotation Sent", patch.status === 403, `got ${patch.status}`);
+  const stillDraft = (await api(`/api/quotations/${q.id}`)).body;
+  ok("quotation stays Draft, still editable in the browser", stillDraft.status === "Draft", stillDraft.status);
+
+  // ── PDF ─────────────────────────────────────────────────────────────
+  const pdfRes = await fetch(`${BASE}/api/quotations/${q.id}/pdf`, {
+    headers: { Authorization: `Bearer ${TOKEN}` }, redirect: "manual",
+  });
+  ok("PDF route -> 200", pdfRes.status === 200, `got ${pdfRes.status}`);
+  ok("served as application/pdf", (pdfRes.headers.get("content-type") || "").includes("application/pdf"), pdfRes.headers.get("content-type"));
+
+  const bytes = new Uint8Array(await pdfRes.arrayBuffer());
+  const magic = String.fromCharCode(...bytes.slice(0, 4));
+  ok("body is a real PDF (%PDF magic)", magic === "%PDF", magic);
+  ok("PDF is not a stub", bytes.length > 3000, `${bytes.length} bytes`);
+  ok("filename carries the document number",
+    (pdfRes.headers.get("content-disposition") || "").includes(q.quotation_number.replace(/[^\w.-]/g, "_")),
+    pdfRes.headers.get("content-disposition"));
+
+  const missing = await fetch(`${BASE}/api/quotations/11111111-2222-4333-8444-555555555555/pdf`, {
+    headers: { Authorization: `Bearer ${TOKEN}` }, redirect: "manual",
+  });
+  ok("PDF for a missing quotation -> 404", missing.status === 404, `got ${missing.status}`);
+
+  // ── business profile ────────────────────────────────────────────────
+  const prof = await api("/api/agent/business-profile");
+  ok("business profile reachable", prof.status === 200 || prof.status === 404, `got ${prof.status}`);
+  if (prof.status === 200) {
+    const raw = JSON.stringify(prof.body);
+    ok("profile carries the company name", typeof prof.body?.companyName === "string");
+    ok("profile withholds bank name", !("bankName" in prof.body), raw.slice(0, 120));
+    ok("profile withholds account number", !raw.includes("bankAccount"));
+    ok("profile withholds SWIFT", !raw.includes("bankSwift"));
+  }
+  }
+
+  const settings = await api("/api/settings");
+  ok("full settings still refused", settings.status === 403, `got ${settings.status}`);
 }
 
 console.log("\n== 8. LOGIN RATE LIMIT ==");

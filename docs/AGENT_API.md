@@ -70,6 +70,8 @@ numbers printed on them.
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/agent/status` | Counts and totals only — no names, no ids |
+| `GET` | `/api/agent/business-profile` | Document header fields; never bank details |
+| `GET` | `/api/quotations/{id}/pdf` | Rendered PDF, same template as the browser |
 | `GET` | `/api/audit` | Recent writes: actor, action, before/after |
 | `GET` | `/api/dashboard` | Overdue invoices, pending milestones |
 | `GET` | `/api/analytics` | Cashflow — collected, pending, monthly |
@@ -81,7 +83,7 @@ numbers printed on them.
 | `POST` | `/api/milestones` | Create |
 | `PUT` | `/api/milestones/{id}` | Update (status transitions enforced) |
 | `GET` `POST` | `/api/quotations` | List / draft a new one (always `Draft`) |
-| `GET` `PATCH` | `/api/quotations/{id}` | Read / change status |
+| `GET` | `/api/quotations/{id}` | Read |
 | `POST` | `/api/quotations/{id}/convert` | Quotation → invoice |
 | `GET` `POST` | `/api/invoices` | List / create |
 | `GET` `PATCH` | `/api/invoices/{id}` | Read / change status |
@@ -92,6 +94,17 @@ The allowlist lives in `src/lib/agent-auth.ts`. Add a route there and here, or i
 stays shut.
 
 ### Two further limits, applied inside the routes
+
+**Quotation status is not the agent's to change.** There is no `PATCH`. Marking a
+quotation `Sent` locks it against editing — `PUT` refuses anything past `Draft` — so
+an agent that moves it early locks the owner out of a document whose prices are
+still under review. Status changes happen in the browser.
+
+**Creates are rate limited.** 60 document creations per minute (`AGENT_WRITES_PER_MINUTE`),
+counted from the audit log, answering `429` with `Retry-After` beyond that. Each
+create burns a sequential document number permanently, so a runaway loop leaves
+gaps that deleting the rows does not repair. Status changes are not counted — a
+loop of those leaves nothing behind. Browser callers are never limited here.
 
 **Quotations may be drafted, not edited.** `POST /api/quotations` is open;
 `PUT /api/quotations/{id}` is not. `createQuotationSchema` has no `status` field, so

@@ -4,6 +4,7 @@ import { getNextNumber } from "@/lib/sequences";
 import { idempotencyKeyFrom, withIdempotency } from "@/lib/idempotency";
 import { callerLabel, sanitizeForCaller } from "@/lib/agent-guard";
 import { recordAudit } from "@/lib/audit";
+import { checkAgentWriteLimit } from "@/lib/agent-rate-limit";
 import { z } from "zod";
 
 const recordPaymentSchema = z.object({
@@ -50,6 +51,9 @@ export async function POST(
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
+
+    const limited = await checkAgentWriteLimit(request);
+    if (limited) return limited;
 
     const { amount, paymentMethod, paymentDate } = parsed.data;
 
